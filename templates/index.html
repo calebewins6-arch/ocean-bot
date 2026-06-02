@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Ocean Bot</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='sky' cx='50%25' cy='35%25'><stop offset='0%25' stop-color='%230a2848'/><stop offset='100%25' stop-color='%23010810'/></radialGradient><radialGradient id='mg' cx='50%25' cy='50%25'><stop offset='0%25' stop-color='%23a0d8ff' stop-opacity='.4'/><stop offset='100%25' stop-color='%23a0d8ff' stop-opacity='0'/></radialGradient></defs><circle cx='50' cy='50' r='50' fill='url(%23sky)'/><circle cx='50' cy='26' r='20' fill='url(%23mg)'/><circle cx='50' cy='26' r='12' fill='%23cce8ff'/><circle cx='56' cy='22' r='10' fill='%230a2848'/><rect x='0' y='60' width='100' height='40' fill='%23012038'/><path d='M0 60 Q20 52 40 60 Q60 68 80 60 Q90 56 100 60 L100 100 L0 100Z' fill='%23014070'/><path d='M0 70 Q25 62 50 70 Q75 78 100 70 L100 100 L0 100Z' fill='%23015888' opacity='.75'/><ellipse cx='50' cy='79' rx='7' ry='2.5' fill='%2388d4f4' opacity='.5'/><ellipse cx='50' cy='85' rx='4' ry='1.5' fill='%2388d4f4' opacity='.3'/></svg>">
+<link rel="apple-touch-icon" href="/static/ocean_banner.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#01080F;--card:rgba(4,16,36,.75);
+  --border:rgba(0,180,216,.14);--accent:#00D4FF;
+  --text:#BEE8FF;--muted:#2E6880;
+  --green:#00FF94;--red:#FF3366;--gold:#FFB800;
+  --purple:#8B5CF6;
+}
+html,body{height:100%;color:var(--text);
+  font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeSpeed;
+  background:radial-gradient(ellipse at 50% 0%,#0a2848 0%,#010810 50%);}
+body{display:flex;flex-direction:column}
+
+/* ═══ OCEAN NIGHT BACKGROUND ═════════════════════════════════════════ */
+.bg-aurora{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+
+/* Moon glow from top-center */
+.orb-moon{
+  position:absolute;width:480px;height:480px;border-radius:50%;
+  top:-18%;left:50%;transform:translateX(-50%);
+  background:radial-gradient(circle,rgba(160,216,255,.18) 0%,rgba(100,180,255,.07) 40%,transparent 70%);
+  animation:moon-pulse 6s ease-in-out infinite alternate;
+  will-change:transform;
+}
+@keyframes moon-pulse{
+  0%{opacity:.7;transform:translateX(-50%) scale(1)}
+  100%{opacity:1;transform:translateX(-50%) scale(1.1)}
+}
+
+/* Deep ocean glow at the bottom */
+.orb-deep{
+  position:absolute;width:900px;height:400px;border-radius:50%;
+  bottom:-15%;left:50%;transform:translateX(-50%);
+  background:radial-gradient(ellipse,rgba(0,60,130,.45) 0%,transparent 65%);
+  animation:deep-sway 14s ease-in-out infinite alternate;
+  will-change:transform;
+}
+@keyframes deep-sway{
+  0%{transform:translateX(-52%) scaleX(1)}
+  100%{transform:translateX(-48%) scaleX(1.08)}
+}
+
+/* Left/right ocean ambient orbs */
+.orb{position:absolute;border-radius:50%;filter:blur(90px);animation:orb-drift ease-in-out infinite alternate;will-change:transform;transform:translateZ(0);backface-visibility:hidden}
+.orb-1{width:620px;height:620px;background:rgba(0,55,150,.26);top:5%;left:-18%;animation-duration:22s}
+.orb-2{width:460px;height:460px;background:rgba(0,170,220,.1);top:25%;right:-16%;animation-duration:28s;animation-delay:-9s}
+.orb-3{width:500px;height:500px;background:rgba(0,35,100,.22);bottom:-10%;left:30%;animation-duration:25s;animation-delay:-5s}
+@keyframes orb-drift{
+  0%{transform:translate(0,0) scale(1)}
+  33%{transform:translate(35px,-45px) scale(1.07)}
+  66%{transform:translate(-25px,30px) scale(.95)}
+  100%{transform:translate(18px,-18px) scale(1.04)}
+}
+
+/* Ocean banner as ultra-faint texture overlay */
+.bg-banner{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:url('/static/ocean_banner.png') center/cover no-repeat;
+  opacity:.045;filter:blur(2px) saturate(1.5);
+}
+
+/* Water surface shimmer at bottom */
+.bg-water{
+  position:fixed;bottom:0;left:0;right:0;height:35vh;
+  pointer-events:none;z-index:0;
+  background:linear-gradient(to top,rgba(0,50,120,.3) 0%,transparent 100%);
+}
+
+/* Subtle grid (water surface feel) */
+.bg-grid{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(0,180,216,.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,180,216,.022) 1px,transparent 1px);
+  background-size:56px 56px;
+}
+
+/* ═══ TOPBAR ═════════════════════════════════════════════════════════ */
+.topbar{
+  position:sticky;top:0;z-index:200;flex-shrink:0;
+  background:rgba(1,8,18,.94);
+  border-bottom:1px solid rgba(0,180,216,.12);
+  backdrop-filter:blur(28px);
+  box-shadow:0 1px 0 rgba(0,212,255,.06),0 8px 32px rgba(0,0,0,.6);
+  display:flex;align-items:center;padding:0 28px;height:60px;gap:6px;
+}
+.logo{
+  font-size:1.1rem;font-weight:900;letter-spacing:.1em;white-space:nowrap;
+  margin-right:14px;display:flex;align-items:center;gap:8px;
+}
+.logo-wave{font-size:1.3rem;animation:wave-bob 3s ease-in-out infinite;will-change:transform;backface-visibility:hidden}
+@keyframes wave-bob{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+.logo-text{
+  background:linear-gradient(135deg,#00D4FF 0%,#7B8CFF 50%,#BF5FFF 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  position:relative;
+}
+.logo-text::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.6) 50%,transparent 100%);
+  background-size:200% 100%;-webkit-background-clip:text;
+  animation:shimmer 4s ease infinite;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+.nav-tabs{display:flex;gap:2px;flex:1}
+.nav-tab{
+  padding:7px 18px;border:none;background:transparent;
+  color:var(--muted);font-size:.83rem;font-weight:700;cursor:pointer;
+  border-radius:7px;transition:all .16s;letter-spacing:.04em;text-transform:uppercase;
+  font-size:.75rem;
+}
+.nav-tab:hover{color:var(--text);background:rgba(0,180,216,.08)}
+.nav-tab.active{color:var(--accent);background:rgba(0,212,255,.12);
+  box-shadow:0 0 0 1px rgba(0,212,255,.2) inset}
+
+.topbar-right{display:flex;align-items:center;gap:10px;margin-left:auto}
+.status-pill{
+  display:flex;align-items:center;gap:7px;
+  background:rgba(0,0,0,.4);border:1px solid rgba(0,180,216,.18);
+  border-radius:20px;padding:5px 13px;font-size:.72rem;font-weight:800;letter-spacing:.06em;
+  backdrop-filter:blur(8px);
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;transition:background .4s;will-change:transform,opacity;backface-visibility:hidden}
+.dot.online{background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse-dot 2s infinite}
+.dot.connecting{background:var(--gold);animation:pulse-dot 1s infinite}
+@keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.7}}
+#bot-user{color:var(--muted);font-size:.74rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ═══ BUTTONS ════════════════════════════════════════════════════════ */
+.btn{
+  padding:9px 20px;border:none;border-radius:8px;cursor:pointer;
+  font-weight:800;font-size:.82rem;letter-spacing:.04em;
+  transition:filter .15s,transform .15s,box-shadow .15s;
+  position:relative;overflow:hidden;
+  will-change:transform;backface-visibility:hidden;transform:translateZ(0);
+}
+.btn:hover{filter:brightness(1.2);transform:translateY(-2px)}
+.btn:active{transform:translateY(0);filter:brightness(.9)}
+.btn-primary{background:linear-gradient(135deg,#005B96,#0094CC,#00D4FF);color:#000;
+  box-shadow:0 4px 20px rgba(0,180,216,.35)}
+.btn-primary:hover{box-shadow:0 6px 30px rgba(0,212,255,.6)}
+.btn-danger{background:linear-gradient(135deg,#8B0020,#FF3366);color:#fff;
+  box-shadow:0 4px 18px rgba(255,51,102,.3)}
+.btn-ghost{background:rgba(0,180,216,.1);color:var(--accent);
+  border:1px solid rgba(0,180,216,.22)}
+.btn-ghost:hover{background:rgba(0,180,216,.2);box-shadow:0 0 20px rgba(0,212,255,.15)}
+.btn-sm{padding:7px 14px;font-size:.77rem}
+.btn-conclude{
+  background:linear-gradient(135deg,#6B0020,#C0002A,#FF3366);
+  color:#fff;padding:11px 24px;font-size:.88rem;font-weight:900;
+  box-shadow:0 4px 24px rgba(255,51,102,.4);letter-spacing:.05em;
+}
+.btn-conclude:hover{box-shadow:0 8px 36px rgba(255,51,102,.65)}
+
+/* ═══ PAGE / LAYOUT ══════════════════════════════════════════════════ */
+.page{display:none;padding:24px 28px;flex:1;overflow-y:auto;position:relative;z-index:1}
+.page.active{display:block}
+
+/* ═══ CARDS ══════════════════════════════════════════════════════════ */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;padding:22px 24px;margin-bottom:18px;
+  backdrop-filter:blur(24px);
+  box-shadow:0 8px 40px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.04);
+  position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.45),transparent);
+}
+.card-title{
+  font-size:.65rem;font-weight:900;letter-spacing:.18em;
+  color:var(--accent);text-transform:uppercase;margin-bottom:16px;
+  display:flex;align-items:center;gap:10px;
+}
+.card-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(0,212,255,.2),transparent)}
+
+/* ═══ ACTIVE SCRIM HERO ══════════════════════════════════════════════ */
+#active-card{transition:border-color .5s,box-shadow .5s}
+.no-scrim-state{
+  display:flex;align-items:center;gap:16px;
+  padding:10px 0;color:var(--muted);font-size:.9rem;
+}
+.no-scrim-icon{font-size:2rem;opacity:.3}
+
+.scrim-hero{display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap}
+.scrim-hero-left{flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px}
+.scrim-hero-right{display:flex;flex-direction:column;gap:9px;align-items:flex-end;flex-shrink:0}
+
+.hero-badge{
+  display:inline-flex;align-items:center;gap:7px;
+  border-radius:20px;padding:5px 14px;font-size:.68rem;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;width:fit-content;
+  border:1px solid currentColor;background:rgba(0,0,0,.35);
+}
+.hero-badge .pulse{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse-dot 1.4s infinite}
+
+.hero-name{
+  font-size:2.6rem;font-weight:900;line-height:1;letter-spacing:.02em;
+  text-shadow:0 0 40px rgba(255,255,255,.15);
+}
+.hero-timer{
+  font-size:1.5rem;font-weight:700;
+  font-variant-numeric:tabular-nums;letter-spacing:.1em;
+  color:rgba(255,255,255,.35);
+}
+.hero-stats{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.stat-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);
+  border-radius:20px;padding:4px 12px;font-size:.75rem;font-weight:700;
+}
+
+/* ═══ CHANNEL ROW ════════════════════════════════════════════════════ */
+.channel-card{
+  background:rgba(0,10,24,.6);border:1px solid var(--border);
+  border-radius:12px;padding:14px 20px;margin-bottom:18px;
+  backdrop-filter:blur(20px);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.channel-label{font-size:.65rem;font-weight:900;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;white-space:nowrap}
+select{
+  background:rgba(0,8,20,.9);border:1px solid rgba(0,180,216,.2);border-radius:8px;
+  color:var(--text);padding:8px 14px;font-size:.86rem;outline:none;cursor:pointer;
+  min-width:200px;transition:border-color .16s,box-shadow .16s;
+}
+select:focus,select:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
+
+/* ═══ GAME MODES SECTION ═════════════════════════════════════════════ */
+.modes-section{margin-bottom:20px}
+.section-divider{
+  display:flex;align-items:center;gap:14px;margin-bottom:16px;
+}
+.section-divider-text{
+  font-size:.62rem;font-weight:900;letter-spacing:.22em;
+  color:rgba(0,212,255,.4);text-transform:uppercase;white-space:nowrap;
+}
+.section-divider::before,.section-divider::after{
+  content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.18),transparent);
+}
+
+.scrim-grid{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:10px;
+}
+@media(max-width:1000px){.scrim-grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:700px){.scrim-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.scrim-grid{grid-template-columns:repeat(2,1fr)}}
+
+.scrim-btn{
+  position:relative;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;padding:22px 10px 18px;border-radius:14px;
+  border:1px solid var(--btn-border,rgba(255,255,255,.08));
+  background:var(--btn-bg,rgba(0,15,35,.9));
+  cursor:pointer;color:var(--text);
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1),
+    box-shadow .25s,border-color .25s;
+  min-height:125px;
+  will-change:transform;backface-visibility:hidden;transform:translateZ(0);
+  box-shadow:var(--btn-inset-glow,none),0 4px 20px rgba(0,0,0,.5);
+}
+/* top inner colour line always visible */
+.scrim-btn::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--btn-color,rgba(0,212,255,.6)),transparent);
+  opacity:.55;transition:opacity .25s;
+}
+.scrim-btn:hover::after{opacity:1}
+/* radial glow from top — partially visible idle, full on hover */
+.scrim-btn::before{
+  content:'';position:absolute;inset:0;
+  opacity:.35;transition:opacity .28s;
+  background:radial-gradient(ellipse at 50% -10%,var(--btn-top-glow,rgba(0,212,255,.35)),transparent 62%);
+}
+.scrim-btn:hover{
+  transform:translateY(-6px) scale(1.03);
+  box-shadow:var(--btn-inset-glow,none),0 18px 50px var(--btn-shadow,rgba(0,212,255,.28)),
+    0 0 0 1px var(--btn-border-h,rgba(0,212,255,.5));
+  border-color:var(--btn-border-h,rgba(0,212,255,.5));
+}
+.scrim-btn:hover::before{opacity:1}
+.scrim-btn.active-type{opacity:.35;cursor:default;pointer-events:none}
+.scrim-btn .mode-emoji{
+  font-size:2.2rem;
+  transition:transform .2s,filter .2s;
+  filter:drop-shadow(0 0 8px var(--btn-color,rgba(0,212,255,.6)));
+}
+.scrim-btn:hover .mode-emoji{transform:scale(1.28);filter:drop-shadow(0 0 20px var(--btn-color,rgba(0,212,255,.95)))}
+.scrim-btn .mode-name{font-size:.78rem;font-weight:800;letter-spacing:.02em;text-align:center;line-height:1.2}
+.scrim-btn .mode-party{
+  font-size:.62rem;font-weight:700;letter-spacing:.08em;
+  color:var(--btn-color,var(--muted));
+  background:rgba(0,0,0,.35);border:1px solid var(--btn-border,rgba(255,255,255,.06));
+  border-radius:10px;padding:2px 8px;margin-top:2px;
+}
+
+/* ═══ PLAYER LIST ════════════════════════════════════════════════════ */
+.player-grid{display:flex;flex-wrap:wrap;gap:8px;min-height:38px}
+.player-chip{
+  display:flex;align-items:center;gap:9px;
+  background:rgba(0,12,28,.7);border:1px solid rgba(0,180,216,.12);
+  border-radius:10px;padding:7px 14px;font-size:.83rem;font-weight:600;
+  transition:border-color .15s;
+}
+.player-chip:hover{border-color:rgba(0,212,255,.3)}
+.player-num{color:var(--muted);font-size:.7rem;font-weight:800;min-width:18px}
+.count-badge{
+  display:inline-flex;align-items:center;
+  background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.22);
+  border-radius:20px;padding:3px 12px;font-size:.75rem;font-weight:800;color:var(--accent);
+}
+
+/* ═══ INPUTS ═════════════════════════════════════════════════════════ */
+.settings-section{margin-bottom:28px}
+.settings-section h3{
+  font-size:.65rem;font-weight:900;color:var(--accent);
+  text-transform:uppercase;letter-spacing:.14em;
+  padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:16px;
+}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid.cols3{grid-template-columns:repeat(3,1fr)}
+.form-grid.cols1{grid-template-columns:1fr}
+.fg{display:flex;flex-direction:column;gap:6px}
+.fg label{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+input[type=text],input[type=password],input[type=number],textarea{
+  background:rgba(0,8,20,.9);border:1px solid rgba(0,180,216,.18);border-radius:8px;
+  color:var(--text);padding:9px 13px;font-size:.86rem;outline:none;
+  transition:border-color .16s,box-shadow .16s;width:100%;
+}
+input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
+textarea{resize:vertical;min-height:56px;font-family:inherit;line-height:1.5}
+.token-wrap{position:relative;display:flex}
+.token-wrap input{padding-right:42px}
+.eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--muted);cursor:pointer;font-size:.95rem}
+.hint{font-size:.71rem;color:var(--muted);margin-top:3px;line-height:1.45}
+.save-bar{display:flex;align-items:center;gap:14px;padding-top:6px}
+#save-note,#save-note2{font-size:.78rem;color:var(--muted);display:none}
+
+/* ═══ TOAST ══════════════════════════════════════════════════════════ */
+#toasts{position:fixed;bottom:26px;right:26px;display:flex;flex-direction:column;gap:9px;z-index:9999}
+.toast{
+  background:linear-gradient(135deg,rgba(3,16,38,.98),rgba(1,9,22,.99));
+  border:1px solid rgba(0,212,255,.18);border-left:3px solid var(--green);
+  border-radius:10px;padding:13px 20px;font-size:.85rem;font-weight:600;
+  box-shadow:0 10px 40px rgba(0,0,0,.7);
+  animation:tin .2s cubic-bezier(.34,1.56,.64,1);min-width:200px;max-width:300px;
+  backdrop-filter:blur(20px);
+}
+.toast.err{border-left-color:var(--red)}
+@keyframes tin{from{transform:translateX(120%) scale(.85);opacity:0}to{transform:none;opacity:1}}
+@keyframes tout{from{opacity:1}to{opacity:0;transform:translateX(120%)}}
+
+/* ═══ SCROLL ═════════════════════════════════════════════════════════ */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:rgba(0,0,0,.2)}
+::-webkit-scrollbar-thumb{background:rgba(0,180,216,.25);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,212,255,.4)}
+
+/* ═══ CLICK EFFECTS ══════════════════════════════════════════════════ */
+@keyframes ripple{to{transform:scale(4.5);opacity:0}}
+@keyframes card-in{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tab-in{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
+@keyframes topbar-in{from{transform:translateY(-100%);opacity:0}to{transform:none;opacity:1}}
+
+/* ═══ SPLASH ═════════════════════════════════════════════════════════ */
+#splash{
+  position:fixed;inset:0;z-index:99999;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 45%,#041220 0%,#010810 100%);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+}
+#splash.out{animation:splash-out 1s cubic-bezier(.4,0,1,1) forwards;pointer-events:none}
+@keyframes splash-out{
+  0%  {opacity:1;filter:brightness(1);transform:scale(1)}
+  22% {filter:brightness(5);opacity:1;transform:scale(1.01)}
+  55% {filter:brightness(1.6);opacity:1;transform:scale(1.05)}
+  100%{opacity:0;transform:scale(1.14);filter:brightness(0)}
+}
+
+/* Rotating aurora ring behind logo */
+.sp-aurora{
+  position:absolute;width:820px;height:820px;border-radius:50%;
+  top:50%;left:50%;
+  background:conic-gradient(from 0deg,
+    rgba(0,50,180,.2),rgba(0,200,255,.13),
+    rgba(90,20,220,.12),rgba(0,180,210,.16),
+    rgba(0,50,180,.2));
+  filter:blur(55px);
+  transform:translate(-50%,-50%) rotate(0deg);
+  animation:aurora-spin 12s linear infinite;
+  will-change:transform;
+}
+@keyframes aurora-spin{
+  to{transform:translate(-50%,-50%) rotate(360deg)}
+}
+
+/* 4 Wave layers */
+.sp-waves{position:absolute;bottom:0;left:0;right:0;height:280px;pointer-events:none}
+.sp-wave{
+  position:absolute;bottom:0;width:240%;left:-70%;
+  border-radius:43% 57% 44% 56% / 48% 52% 48% 52%;
+  animation:wave-roll linear infinite;will-change:transform;backface-visibility:hidden;
+}
+.sp-wave-1{height:210px;bottom:-65px;background:rgba(0,50,130,.48);animation-duration:7s}
+.sp-wave-2{height:175px;bottom:-95px;background:rgba(0,90,170,.32);animation-duration:10s;animation-direction:reverse}
+.sp-wave-3{height:145px;bottom:-120px;background:rgba(0,150,210,.2);animation-duration:14s}
+.sp-wave-4{height:115px;bottom:-142px;background:rgba(0,210,240,.09);animation-duration:18s;animation-direction:reverse}
+@keyframes wave-roll{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+
+/* Bubbles */
+.sp-bubble{
+  position:absolute;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle at 28% 28%,rgba(0,220,255,.65),rgba(0,100,200,.05));
+  border:1px solid rgba(0,212,255,.45);
+  animation:bubble-rise linear infinite;will-change:transform,opacity;backface-visibility:hidden;
+}
+@keyframes bubble-rise{
+  0%  {transform:translateY(0) translateX(0);opacity:0}
+  6%  {opacity:1}
+  90% {opacity:.75}
+  100%{transform:translateY(-115vh) translateX(var(--drift,15px));opacity:0}
+}
+
+/* Pulse rings from emoji */
+.sp-ring{
+  position:absolute;border-radius:50%;pointer-events:none;
+  border:1px solid rgba(0,212,255,.75);
+  width:70px;height:70px;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  animation:ring-expand 2.2s ease-out infinite;will-change:transform,opacity;
+}
+.sp-ring:nth-child(2){animation-delay:.75s}
+.sp-ring:nth-child(3){animation-delay:1.5s}
+@keyframes ring-expand{
+  0%  {width:65px;height:65px;opacity:1;border-color:rgba(0,212,255,.85)}
+  100%{width:300px;height:300px;opacity:0;border-color:rgba(0,212,255,0)}
+}
+
+/* Content */
+.sp-inner{position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;text-align:center}
+.sp-emoji{
+  font-size:5.8rem;
+  animation:emoji-zoom .9s cubic-bezier(.34,1.4,.64,1) both;
+  filter:drop-shadow(0 0 44px rgba(0,212,255,.9));
+  will-change:transform,opacity;backface-visibility:hidden;
+}
+@keyframes emoji-zoom{
+  0%  {opacity:0;transform:scale(4) rotate(-22deg);filter:blur(22px) drop-shadow(0 0 0 transparent)}
+  55% {filter:blur(3px) drop-shadow(0 0 70px rgba(0,212,255,1))}
+  100%{opacity:1;transform:scale(1) rotate(0deg);filter:blur(0) drop-shadow(0 0 44px rgba(0,212,255,.9))}
+}
+
+.sp-letters{display:flex;align-items:baseline;margin-top:24px}
+.sp-char{
+  font-size:4.2rem;font-weight:900;letter-spacing:.07em;
+  background:linear-gradient(160deg,#fff 0%,#00D4FF 38%,#7B8FFF 68%,#C080FF 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 22px rgba(0,212,255,.55));
+  animation:char-slam .38s cubic-bezier(.34,1.56,.64,1) both;
+  will-change:transform,opacity;backface-visibility:hidden;
+}
+@keyframes char-slam{
+  0%  {opacity:0;transform:translateY(-70px) scale(.15);filter:blur(10px)}
+  65% {filter:blur(1px)}
+  100%{opacity:1;transform:none;filter:blur(0)}
+}
+.sp-space{width:.42em}
+
+.sp-tagline{
+  font-size:.68rem;font-weight:900;letter-spacing:.32em;text-transform:uppercase;
+  color:rgba(0,212,255,.42);margin-top:18px;
+  animation:fade-up .5s 1.05s both;
+}
+
+.sp-bar-wrap{
+  width:270px;height:5px;background:rgba(0,180,216,.07);
+  border-radius:5px;margin-top:40px;overflow:visible;
+  box-shadow:0 0 0 1px rgba(0,212,255,.05);
+  animation:fade-up .4s .8s both;position:relative;
+}
+.sp-bar-fill{
+  height:100%;width:0;border-radius:5px;
+  background:linear-gradient(90deg,#0047FF,#00B4FF,#00F5D4,#00B4FF);
+  background-size:300% 100%;
+  transition:width 1.45s cubic-bezier(.22,.61,.36,1);
+  box-shadow:0 0 16px rgba(0,212,255,.95),0 0 34px rgba(0,212,255,.4);
+  animation:bar-scan 2s .85s linear infinite;
+  will-change:width;position:relative;
+}
+.sp-bar-fill::after{
+  content:'';position:absolute;right:-5px;top:50%;
+  width:15px;height:15px;border-radius:50%;
+  transform:translateY(-50%);
+  background:radial-gradient(circle,#fff 0%,#00F5D4 45%,transparent 100%);
+  box-shadow:0 0 16px #00F5D4,0 0 32px #00D4FF,0 0 50px rgba(0,212,255,.4);
+}
+@keyframes bar-scan{0%{background-position:300% 0}100%{background-position:-300% 0}}
+
+.sp-status{
+  font-size:.69rem;font-weight:700;letter-spacing:.13em;
+  color:rgba(0,212,255,.35);margin-top:20px;min-height:1em;
+  animation:fade-up .4s 1.15s both;transition:opacity .22s;
+}
+@keyframes fade-up{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+/* ═══ MISC ═══════════════════════════════════════════════════════════ */
+code{
+  background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.18);
+  border-radius:4px;padding:1px 6px;font-size:.82em;color:var(--accent);
+}
+
+/* ═══ ENHANCED ANIMATIONS ════════════════════════════════════════════ */
+
+/* Cards lift on hover + hairline pulses */
+.card{transition:transform .22s ease,box-shadow .22s ease,border-color .25s ease}
+.card:hover{transform:translateY(-3px)}
+.card::before{animation:hairline-pulse 4s ease-in-out infinite}
+@keyframes hairline-pulse{
+  0%,100%{left:12%;right:12%;opacity:.45}
+  50%{left:4%;right:4%;opacity:1}
+}
+
+/* Channel card hover */
+.channel-card{transition:border-color .22s,box-shadow .22s}
+.channel-card:hover{border-color:rgba(0,212,255,.3);box-shadow:0 0 24px rgba(0,212,255,.07)}
+
+/* Section divider line breathes */
+.section-divider::before,.section-divider::after{
+  animation:divider-breathe 3s ease-in-out infinite alternate;
+}
+@keyframes divider-breathe{from{opacity:.3;transform:scaleX(.6)}to{opacity:1;transform:scaleX(1)}}
+
+/* No-scrim icon floats */
+.no-scrim-icon{animation:icon-float 3.5s ease-in-out infinite}
+@keyframes icon-float{
+  0%,100%{transform:translateY(0) rotate(-6deg)}
+  50%{transform:translateY(-10px) rotate(6deg)}
+}
+
+/* Scrim mode buttons — idle emoji float, staggered per-button */
+.scrim-btn .mode-emoji{animation:emoji-float 3.5s ease-in-out infinite}
+@keyframes emoji-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.scrim-btn:hover .mode-emoji{animation:none;transform:scale(1.28)}
+
+/* Active scrim border breathes */
+#active-card.is-live{animation:live-glow 2.5s ease-in-out infinite}
+@keyframes live-glow{
+  0%,100%{box-shadow:0 0 30px var(--live-c,rgba(0,212,255,.12)),0 8px 40px rgba(0,0,0,.6)}
+  50%{box-shadow:0 0 60px var(--live-c,rgba(0,212,255,.28)),0 8px 40px rgba(0,0,0,.6)}
+}
+
+/* Hero live badge breathes */
+.hero-badge{animation:badge-breathe 2.2s ease-in-out infinite}
+@keyframes badge-breathe{
+  0%,100%{box-shadow:0 0 0 0 transparent}
+  50%{box-shadow:0 0 0 5px rgba(255,255,255,.06)}
+}
+
+/* Hero timer ticks */
+.hero-timer{animation:timer-tick 1s step-end infinite}
+@keyframes timer-tick{0%{opacity:1}45%{opacity:1}50%{opacity:.45}95%{opacity:.45}100%{opacity:1}}
+
+/* Stat pills pop in */
+@keyframes stat-pop{from{opacity:0;transform:scale(.6) translateY(6px)}to{opacity:1;transform:none}}
+.stat-pill{animation:stat-pop .3s cubic-bezier(.34,1.56,.64,1) both}
+.stat-pill:nth-child(2){animation-delay:.07s}
+
+/* Player chips cascade in */
+@keyframes chip-in{from{opacity:0;transform:translateY(10px) scale(.88)}to{opacity:1;transform:none}}
+.player-chip{animation:chip-in .22s cubic-bezier(.34,1.56,.64,1) both}
+
+/* Count badge pops when it changes */
+@keyframes badge-pop{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}
+.badge-popping{animation:badge-pop .35s cubic-bezier(.34,1.56,.64,1)}
+
+/* Nav tab underline slides in */
+.nav-tab.active::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation:tab-line-slide .25s ease both;border-radius:2px;
+}
+@keyframes tab-line-slide{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
+
+/* Toast bounces in */
+.toast{animation:toast-bounce .3s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes toast-bounce{from{transform:translateX(120%) scale(.8) rotate(3deg);opacity:0}to{transform:none;opacity:1}}
+
+/* Dispatch modal pops in */
+#dispatch-modal > div{animation:modal-pop .28s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes modal-pop{from{transform:scale(.82) translateY(24px);opacity:0}to{transform:none;opacity:1}}
+
+/* Logo text shimmer sweep */
+.logo-text::after{animation:logo-shimmer 5s ease infinite}
+@keyframes logo-shimmer{0%,100%{background-position:200% 0}50%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+
+<!-- Ocean night background -->
+<div class="bg-banner"></div>
+<div class="bg-aurora">
+  <div class="orb-moon"></div>
+  <div class="orb-deep"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+<div class="bg-water"></div>
+<div class="bg-grid"></div>
+
+<!-- Topbar -->
+<header class="topbar">
+  <div class="logo">
+    <span class="logo-wave">🌊</span>
+    <span class="logo-text">OCEAN BOT</span>
+  </div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('dashboard',this)">Dashboard</button>
+    <button class="nav-tab" onclick="showPage('schedule',this)">Schedule</button>
+    <button class="nav-tab" onclick="showPage('settings',this)">Settings</button>
+    <button class="nav-tab" onclick="showPage('config',this)">Config</button>
+  </nav>
+  <div class="topbar-right">
+    <div class="status-pill">
+      <div class="dot" id="dot"></div>
+      <span id="status-text">OFFLINE</span>
+    </div>
+    <span id="bot-user"></span>
+    <button class="btn btn-primary btn-sm" id="toggle-btn" onclick="toggleBot()">Start Bot</button>
+  </div>
+</header>
+
+<!-- ══════════════ DASHBOARD ══════════════ -->
+<div class="page active" id="page-dashboard">
+
+  <!-- Active scrim -->
+  <div class="card" id="active-card">
+    <div class="card-title">Active Scrim</div>
+    <div id="active-content">
+      <div class="no-scrim-state">
+        <span class="no-scrim-icon">🎮</span>
+        <span>No scrim running — select a game mode below to start.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel row -->
+  <div class="channel-card">
+    <span class="channel-label">Scrim Channel</span>
+    <select id="channel-select" onchange="saveChannel()">
+      <option value="">— select channel —</option>
+    </select>
+    <button class="btn btn-ghost btn-sm" onclick="loadChannels()">↻</button>
+    <span id="channel-hint" style="font-size:.78rem;color:var(--muted)"></span>
+  </div>
+
+  <!-- Game modes -->
+  <div class="modes-section">
+    <div class="section-divider">
+      <span class="section-divider-text">Select Game Mode</span>
+    </div>
+    <div class="scrim-grid" id="scrim-grid"></div>
+  </div>
+
+  <!-- Sign-ups -->
+  <div class="card" id="signups-card" style="display:none">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span id="signups-card-title">✋ Sign-ups</span>
+      <span id="signup-count-badge" class="count-badge">0</span>
+    </div>
+    <div class="player-grid" id="signup-list">
+      <span style="color:var(--muted);font-size:.84rem">Waiting for players to react ✋</span>
+    </div>
+  </div>
+
+  <!-- Invite Card -->
+  <div class="card" style="border-color:rgba(0,212,255,.28);box-shadow:0 0 24px rgba(0,212,255,.06)">
+    <div class="card-title">🌊 Invite to Server</div>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:18px;line-height:1.6">Post an @everyone invite embed to any channel so players can join your Discord server.</p>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div class="fg" style="flex:1;min-width:200px">
+        <label>Post Channel</label>
+        <div style="display:flex;gap:8px">
+          <select id="invite-channel" style="flex:1"><option value="">— select channel —</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadInviteChannels()">↻</button>
+        </div>
+      </div>
+      <button class="btn btn-sm" style="background:linear-gradient(135deg,#005B96,#0094CC,#00D4FF);color:#000;font-weight:900;padding:10px 22px;box-shadow:0 4px 18px rgba(0,180,216,.35);white-space:nowrap" onclick="postInvite()">🌊 Post Invite</button>
+    </div>
+    <div class="hint" style="margin-top:10px">Make sure your invite link is set in <strong style="color:var(--text)">Settings → Invite Link</strong> first.</div>
+  </div>
+
+  <!-- Scrim Announcement -->
+  <div class="card" style="border-color:rgba(255,184,0,.2);box-shadow:0 0 24px rgba(255,184,0,.05)">
+    <div class="card-title" style="color:var(--gold)">📢 Scrim Announcement</div>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:18px;line-height:1.6">Post a timed announcement with Discord's live countdown — shows the start time and how long until it begins.</p>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div class="fg">
+        <label>Post Channel</label>
+        <div style="display:flex;gap:8px">
+          <select id="ann-channel" style="flex:1"><option value="">— select channel —</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadAnnChannels()">↻</button>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Scrim Type</label>
+        <select id="ann-scrim-type"></select>
+      </div>
+    </div>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div class="fg">
+        <label>Title</label>
+        <input type="text" id="ann-title" placeholder="e.g. DUOS SCRIMS — WEEK 10 DAY 4">
+        <div class="hint">Leave blank to auto-fill with the scrim name</div>
+      </div>
+      <div class="fg">
+        <label>Start Time</label>
+        <input type="time" id="ann-time" style="color-scheme:dark;max-width:160px">
+        <div class="hint">Shows as live countdown in Discord</div>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:18px">
+      <label>Extra Info (optional)</label>
+      <textarea id="ann-message" rows="2" placeholder="e.g. Top 25 from today's rank-leaderboards will qualify to Silver"></textarea>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.84rem;color:var(--text)">
+        <input type="checkbox" id="ann-ping" checked style="width:16px;height:16px;accent-color:var(--accent)">
+        @everyone ping
+      </label>
+      <button class="btn btn-sm" style="background:linear-gradient(135deg,#7A5800,#C8900A,#FFB800);color:#000;font-weight:900;padding:10px 22px;box-shadow:0 4px 18px rgba(255,184,0,.3);margin-left:auto" onclick="postScrimAnnouncement()">📢 Post Announcement</button>
+    </div>
+  </div>
+
+  <!-- Missed out -->
+  <div class="card" id="missed-card" style="display:none;border-color:rgba(255,165,0,.22)">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>🙋 Missed Out</span>
+      <span id="missed-count-badge" style="display:inline-flex;align-items:center;background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.25);border-radius:20px;padding:3px 12px;font-size:.75rem;font-weight:800;color:#FFA500">0</span>
+    </div>
+    <div class="player-grid" id="missed-list">
+      <span style="color:var(--muted);font-size:.84rem">No missed sign-ups yet</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════ SCHEDULE ══════════════ -->
+<div class="page" id="page-schedule">
+
+  <div class="card" style="border-color:rgba(0,212,255,.3)">
+    <div class="card-title">Auto Schedule</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
+      <div>
+        <div style="font-size:1rem;font-weight:700;margin-bottom:5px">Post every <span id="sch-interval-label">30</span> minutes</div>
+        <div style="font-size:.8rem;color:var(--muted)">Aligned to clock — posts at :00 and :30 each hour</div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <span id="sch-status-text" style="font-size:.8rem;color:var(--muted)">Disabled</span>
+        <label style="position:relative;display:inline-block;width:50px;height:27px;cursor:pointer">
+          <input type="checkbox" id="sch-toggle" onchange="toggleSchedule()" style="opacity:0;width:0;height:0">
+          <span id="sch-track" style="position:absolute;inset:0;background:#0a1828;border-radius:27px;transition:.3s;border:1px solid var(--border)">
+            <span id="sch-thumb" style="position:absolute;left:3px;top:3px;width:19px;height:19px;background:var(--muted);border-radius:50%;transition:.3s;box-shadow:0 2px 6px rgba(0,0,0,.5)"></span>
+          </span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Next Post In</div>
+    <div style="display:flex;align-items:center;gap:22px;flex-wrap:wrap">
+      <div id="sch-countdown" style="font-size:3rem;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:.06em;background:linear-gradient(135deg,var(--accent),#00F5D4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 16px rgba(0,212,255,.4))">--:--</div>
+      <div style="color:var(--muted);font-size:.84rem">until next scheduled post</div>
+      <button class="btn btn-ghost btn-sm" onclick="postNow()" style="margin-left:auto">Post Now</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Schedule Settings</div>
+    <div class="settings-section">
+      <h3>Channel & Timing</h3>
+      <div class="form-grid">
+        <div class="fg">
+          <label>Schedule Channel</label>
+          <div style="display:flex;gap:8px">
+            <select id="sch-channel" onchange="saveScheduleSettings()" style="flex:1"><option value="">— select channel —</option></select>
+            <button class="btn btn-ghost btn-sm" onclick="loadScheduleChannels()">↻</button>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Interval</label>
+          <select id="sch-interval" onchange="saveScheduleSettings()">
+            <option value="15">Every 15 min</option>
+            <option value="30" selected>Every 30 min</option>
+            <option value="45">Every 45 min</option>
+            <option value="60">Every 60 min</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Start Time (24h)</label>
+          <input type="time" id="sch-start-time" onchange="saveScheduleSettings()" style="max-width:150px;color-scheme:dark">
+          <div class="hint">e.g. 18:00 → posts at 6:00, 6:30, 7:00 PM...</div>
+        </div>
+        <div class="fg">
+          <label>Timezone</label>
+          <div style="background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.15);border-radius:8px;padding:10px 14px;font-size:.83rem;color:var(--accent);font-weight:700">Uses your PC's system time</div>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Post Content</h3>
+      <div class="form-grid">
+        <div class="fg">
+          <label>Scrim Type</label>
+          <select id="sch-scrim-type" onchange="saveScheduleSettings()"></select>
+        </div>
+        <div class="fg">
+          <label>Links (shown below timer)</label>
+          <input type="text" id="sch-links" placeholder="[Discord](https://...) | [Sign Up](https://...)" onchange="saveScheduleSettings()">
+          <div class="hint">Supports Discord markdown links</div>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Banner</h3>
+      <div style="border-radius:12px;overflow:hidden;border:1px solid var(--border);max-width:500px;box-shadow:0 4px 24px rgba(0,0,0,.5)">
+        <img src="/static/ocean_banner.png" alt="Banner" style="width:100%;display:block">
+      </div>
+      <div class="hint" style="margin-top:10px">Replace <code>static/ocean_banner.png</code> to update.</div>
+    </div>
+  </div>
+
+  <!-- Code Alert -->
+  <div class="card" style="border-color:rgba(255,184,0,.2)">
+    <div class="card-title" style="color:var(--gold)">⚡ Code Alert</div>
+    <p style="font-size:.84rem;color:var(--muted);margin-bottom:18px;line-height:1.6">Post a countdown to any channel — <strong style="color:var(--text)">@everyone CODE IN X MINUTES</strong></p>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="fg">
+        <label>Channel</label>
+        <div style="display:flex;gap:8px">
+          <select id="alert-channel" style="flex:1"><option value="">— select channel —</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadAlertChannels()">↻</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" style="background:linear-gradient(135deg,#7A5800,#FFB800);color:#000;font-size:.9rem;padding:11px 22px;font-weight:900;box-shadow:0 4px 18px rgba(255,184,0,.3)" onclick="sendCodeAlert(10)">10 min</button>
+        <button class="btn" style="background:linear-gradient(135deg,#7A5800,#FFB800);color:#000;font-size:.9rem;padding:11px 22px;font-weight:900;box-shadow:0 4px 18px rgba(255,184,0,.3)" onclick="sendCodeAlert(5)">5 min</button>
+        <button class="btn" style="background:linear-gradient(135deg,#7A5800,#FFB800);color:#000;font-size:.9rem;padding:11px 22px;font-weight:900;box-shadow:0 4px 18px rgba(255,184,0,.3)" onclick="sendCodeAlert(2)">2 min</button>
+        <button class="btn" style="background:linear-gradient(135deg,#7A5800,#FFB800);color:#000;font-size:.9rem;padding:11px 22px;font-weight:900;box-shadow:0 4px 18px rgba(255,184,0,.3)" onclick="sendCodeAlert(1)">1 min</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════ SETTINGS ══════════════ -->
+<div class="page" id="page-settings">
+  <div class="card">
+    <div class="settings-section">
+      <h3>Game Settings</h3>
+      <div class="form-grid">
+        <div class="fg">
+          <label>Max Games per Session</label>
+          <input type="number" id="s-max-games" placeholder="0 = unlimited" min="0" max="99" style="max-width:160px">
+          <div class="hint">Bot auto-concludes when this many <code>!started</code> calls are made.</div>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Sign-up Settings</h3>
+      <div class="form-grid cols1">
+        <div class="fg"><label>Host Name</label><input type="text" id="s-host" placeholder="Ocean Scrims"></div>
+        <div class="fg"><label>Allowed Platforms</label><input type="text" id="s-platforms" placeholder="PC / Windows, PlayStation, Xbox, Mobile"></div>
+        <div class="fg" style="flex-direction:row;align-items:center;gap:10px">
+          <input type="checkbox" id="s-verify" style="width:17px;height:17px;cursor:pointer;accent-color:var(--accent)">
+          <label for="s-verify" style="text-transform:none;letter-spacing:0;font-size:.86rem;cursor:pointer;color:var(--text)">Show verification required warning</label>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Commands</h3>
+      <div class="form-grid cols3">
+        <div class="fg"><label>Prefix</label><input type="text" id="s-prefix" placeholder="!" maxlength="3" style="max-width:70px"></div>
+        <div class="fg"><label>Concluded</label><input type="text" id="s-cmd-concluded" placeholder="concluded"></div>
+        <div class="fg"><label>Started</label><input type="text" id="s-cmd-started" placeholder="started"><div class="hint">e.g. !started 100</div></div>
+      </div>
+      <br>
+      <div class="form-grid cols3" id="scrim-cmds"></div>
+    </div>
+    <div class="settings-section">
+      <h3>Concluded Message</h3>
+      <div class="form-grid cols1">
+        <div class="fg"><label>Line 1</label><input type="text" id="s-line1" placeholder="Games will resume..."></div>
+        <div class="fg"><label>Line 2</label><input type="text" id="s-line2" placeholder="SEE YOU THEN :)"></div>
+        <div class="fg"><label>Line 3 (invite appended)</label><input type="text" id="s-line3" placeholder="Make sure to invite your friends,"></div>
+        <div class="fg"><label>Server Invite Link</label><input type="text" id="s-invite" placeholder="https://discord.gg/..."></div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Start Messages</h3>
+      <div class="form-grid cols1" id="start-msgs"></div>
+    </div>
+    <div class="save-bar">
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      <span id="save-note">Restart bot to apply command changes.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ CONFIG ══════════════ -->
+<div class="page" id="page-config">
+  <div class="card">
+    <div class="settings-section">
+      <h3>Bot Configuration</h3>
+      <div class="form-grid cols1">
+        <div class="fg">
+          <label>Bot Token</label>
+          <div class="token-wrap">
+            <input type="password" id="c-token" placeholder="Paste your Discord bot token">
+            <button class="eye-btn" onclick="toggleEye()">👁</button>
+          </div>
+          <div class="hint">discord.com/developers → Applications → your bot → Bot → Reset Token</div>
+        </div>
+        <div class="fg">
+          <label>Server (Guild) ID</label>
+          <input type="text" id="c-guild" placeholder="Right-click your server → Copy Server ID">
+          <div class="hint">Enable Developer Mode in Discord settings first</div>
+        </div>
+      </div>
+    </div>
+    <div class="save-bar">
+      <button class="btn btn-primary" onclick="saveConfig()">Save Config</button>
+      <span id="save-note2">Restart the bot for changes to take effect.</span>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<!-- Dispatch Modal -->
+<div id="dispatch-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(14px);z-index:500;align-items:center;justify-content:center">
+  <div style="background:linear-gradient(145deg,rgba(3,16,38,.98),rgba(1,8,20,.99));border:1px solid rgba(0,212,255,.22);border-radius:18px;padding:34px;width:440px;max-width:92vw;box-shadow:0 28px 80px rgba(0,0,0,.9);position:relative;overflow:hidden">
+    <div style="position:absolute;top:0;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,rgba(0,212,255,.55),transparent)"></div>
+    <div style="font-size:1.3rem;font-weight:900;background:linear-gradient(135deg,#00D4FF,#7BAAFF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px">🚀 Dispatch Match</div>
+    <p style="color:var(--muted);font-size:.84rem;margin-bottom:22px;line-height:1.65">Enter the match code. The sign-up embed will be <strong style="color:var(--red)">deleted</strong> and an animated dispatch will play in Discord.</p>
+    <div class="fg" style="margin-bottom:22px">
+      <label>Match Code</label>
+      <input type="text" id="match-code-input" placeholder="e.g. ocean-5421" style="font-size:1.05rem;letter-spacing:.07em;font-weight:700" autocomplete="off">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeDispatchModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitDispatch()">🚀 Dispatch!</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let SCRIMS = {};
+let cachedStatus = null;
+let timerInterval = null;
+let statusInterval = null;
+
+// ── Init ──────────────────────────────────────────────────────────────
+async function init() {
+  const meta = await api('/api/meta');
+  SCRIMS = meta.scrims;
+  buildScrimGrid();
+  buildSettingsFields();
+  await loadChannels();
+  await updateStatus();
+  await loadSettings();
+  statusInterval = setInterval(updateStatus, 5000);
+  timerInterval = setInterval(updateTimer, 1000);
+}
+
+// ── Nav ───────────────────────────────────────────────────────────────
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  page.classList.add('active');
+  btn.classList.add('active');
+  page.style.animation = 'none'; void page.offsetWidth;
+  page.style.animation = 'tab-in .2s ease both';
+  page.querySelectorAll('.card').forEach((c, i) => {
+    c.style.animation = 'none'; void c.offsetWidth;
+    c.style.animation = `card-in .28s ease ${i * 0.055}s both`;
+  });
+  if (name === 'settings') loadSettings();
+  if (name === 'config') loadConfig();
+  if (name === 'schedule') { loadScheduleChannels(); loadScheduleSettings(); }
+}
+
+// ── API ───────────────────────────────────────────────────────────────
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  return (await fetch(path, opts)).json();
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Build scrim grid ──────────────────────────────────────────────────
+function buildScrimGrid() {
+  const grid = document.getElementById('scrim-grid');
+  // Populate announcement scrim picker
+  const annSel=document.getElementById('ann-scrim-type');
+  if(annSel) annSel.innerHTML=Object.entries(SCRIMS).map(([k,v])=>`<option value="${k}">${v.emoji} ${v.name}</option>`).join('');
+
+  grid.innerHTML = Object.entries(SCRIMS).map(([key, s], i) => {
+    const party = s.party === 1 ? 'Solo' : s.party === 2 ? 'Duos' : s.party === 3 ? 'Trios' : 'Squads';
+    return `<button class="scrim-btn" id="sbtn-${key}"
+      style="
+        --btn-bg: linear-gradient(175deg, ${s.hex}30 0%, ${s.hex}16 35%, rgba(0,5,16,.97) 75%);
+        --btn-top-glow: ${s.hex}55;
+        --btn-border: ${s.hex}40;
+        --btn-border-h: ${s.hex}99;
+        --btn-shadow: ${s.hex}50;
+        --btn-color: ${s.hex};
+        --btn-inset-glow: inset 0 1px 0 ${s.hex}50;
+      "
+      onclick="startScrim('${key}')" data-color="${s.hex}">
+      <span class="mode-emoji" style="animation-delay:${i*0.28}s">${s.emoji}</span>
+      <span class="mode-name" style="color:rgba(255,255,255,.92);letter-spacing:.01em">${s.name}</span>
+      <span class="mode-party" style="color:${s.hex};border-color:${s.hex}40;background:${s.hex}15">${party}</span>
+    </button>`;
+  }).join('');
+}
+
+// ── Build settings fields ─────────────────────────────────────────────
+function buildSettingsFields() {
+  document.getElementById('scrim-cmds').innerHTML = Object.entries(SCRIMS).map(([key, s]) =>
+    `<div class="fg"><label>${s.emoji} ${s.name}</label><input type="text" id="s-cmd-${key}" placeholder="${key}"></div>`
+  ).join('');
+  document.getElementById('start-msgs').innerHTML = Object.entries(SCRIMS).map(([key, s]) =>
+    `<div class="fg"><label>${s.emoji} ${s.name} Start Message</label><textarea id="s-msg-${key}" rows="2"></textarea></div>`
+  ).join('');
+}
+
+// ── Status ────────────────────────────────────────────────────────────
+async function updateStatus() {
+  const s = await api('/api/status');
+  cachedStatus = s;
+  renderStatusBar(s);
+  renderActiveScrim(s);
+  if (s.active_scrim) loadSignups();
+}
+
+function renderStatusBar(s) {
+  const dot = document.getElementById('dot');
+  const txt = document.getElementById('status-text');
+  const btn = document.getElementById('toggle-btn');
+  const user = document.getElementById('bot-user');
+  if (s.running && s.user) {
+    dot.className = 'dot online'; txt.textContent = 'ONLINE';
+    user.textContent = s.user; btn.textContent = 'Stop Bot'; btn.className = 'btn btn-danger btn-sm';
+  } else if (s.running) {
+    dot.className = 'dot connecting'; txt.textContent = 'CONNECTING';
+    user.textContent = ''; btn.textContent = 'Stop Bot'; btn.className = 'btn btn-danger btn-sm';
+  } else {
+    dot.className = 'dot'; txt.textContent = 'OFFLINE';
+    user.textContent = ''; btn.textContent = 'Start Bot'; btn.className = 'btn btn-primary btn-sm';
+    if (s.error) toast('Bot error: ' + s.error, true);
+  }
+}
+
+function renderActiveScrim(s) {
+  const card = document.getElementById('active-card');
+  const content = document.getElementById('active-content');
+
+  Object.keys(SCRIMS).forEach(key => {
+    const btn = document.getElementById('sbtn-' + key);
+    if (btn) btn.classList.remove('active-type');
+  });
+
+  if (s.active_scrim && SCRIMS[s.active_scrim]) {
+    const sc = SCRIMS[s.active_scrim];
+    card.style.borderColor = sc.hex + '60';
+    card.style.setProperty('--live-c', sc.hex + '30');
+    card.classList.add('is-live');
+
+    const badgeColor = s.dispatched ? '#FFA500' : sc.hex;
+    const badgeLabel = s.dispatched ? 'DISPATCHED' : 'LIVE — SIGN UPS OPEN';
+    const signupLine = s.dispatched
+      ? `🙋 ${s.missed_count||0} missed`
+      : `✋ ${s.signup_count||0} signed up`;
+
+    const dispatchBtn = !s.dispatched
+      ? `<button class="btn btn-sm" style="background:linear-gradient(135deg,#003F6E,#0077B6,#00A8E8);color:#fff;font-weight:800;padding:10px 18px;box-shadow:0 4px 18px rgba(0,168,232,.35)" onclick="openDispatchModal()">🚀 Dispatch</button>`
+      : `<div style="display:flex;gap:7px;align-items:center">
+           <div style="background:rgba(255,165,0,.12);color:#FFA500;border:1px solid rgba(255,165,0,.28);border-radius:8px;padding:10px 16px;font-size:.82rem;font-weight:800">🚀 Dispatched</div>
+           <button class="btn btn-sm" style="background:rgba(255,51,102,.12);color:var(--red);border:1px solid rgba(255,51,102,.28);font-weight:800" onclick="endDispatch()">✕ End</button>
+         </div>`;
+
+    content.innerHTML = `
+      <div class="scrim-hero">
+        <div class="scrim-hero-left">
+          <div class="hero-badge" style="color:${badgeColor}">
+            <span class="pulse"></span>${badgeLabel}
+          </div>
+          <div class="hero-name" style="background:linear-gradient(135deg,${sc.hex} 0%,rgba(255,255,255,.9) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 24px ${sc.hex}50)">
+            ${sc.emoji} ${sc.name} Scrims
+          </div>
+          <div class="hero-timer" id="scrim-timer">00:00:00</div>
+          <div class="hero-stats">
+            <div class="stat-pill" style="border-color:${sc.hex}30;color:${sc.hex}">
+              GAME ${s.game_number||0}${s.max_games>0?' / '+s.max_games:''}
+            </div>
+            <div class="stat-pill">${signupLine}</div>
+          </div>
+        </div>
+        <div class="scrim-hero-right">
+          ${dispatchBtn}
+          <div style="display:flex;gap:7px;align-items:flex-end">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-size:.63rem;color:var(--muted);font-weight:800;letter-spacing:.08em;text-align:center">NEXT TIME</div>
+              <input type="time" id="next-game-time" style="width:118px;padding:8px 10px;font-size:.88rem;border-radius:8px;background:rgba(0,8,20,.9);border:1px solid ${sc.hex}44;color:var(--text);color-scheme:dark;font-weight:700">
+              <div style="font-size:.63rem;color:var(--muted);text-align:center">blank = auto</div>
+            </div>
+            <input type="number" id="started-count" placeholder="players" min="1" max="999" style="width:80px;padding:9px 10px;font-size:.83rem;border-radius:8px;background:rgba(0,8,20,.9);border:1px solid var(--border);color:var(--text)">
+            <button class="btn btn-sm" style="background:linear-gradient(135deg,#006830,#00A84A,#00FF94);color:#000;font-weight:900;padding:10px 16px;box-shadow:0 4px 18px rgba(0,200,80,.3);white-space:nowrap" onclick="postStarted()">🎮 Start Game</button>
+          </div>
+          <button class="btn btn-sm" style="background:linear-gradient(135deg,#001F4A,#003580,#0053C2);color:#fff;font-weight:800;padding:10px 18px;border:1px solid rgba(0,150,255,.25)" onclick="postAnnouncement()">📢 Post Announcement</button>
+          <button class="btn btn-conclude" onclick="concludeScrim()">🏁 Conclude Scrims</button>
+        </div>
+      </div>`;
+
+    document.getElementById('signups-card').style.display = 'block';
+    document.getElementById('signups-card-title').textContent = s.dispatched ? '✋ Sign-ups (pre-dispatch)' : '✋ Sign-ups';
+    document.getElementById('missed-card').style.display = s.dispatched ? 'block' : 'none';
+
+    const activeBtn = document.getElementById('sbtn-' + s.active_scrim);
+    if (activeBtn) activeBtn.classList.add('active-type');
+    updateTimer();
+  } else {
+    card.style.borderColor = 'rgba(0,180,216,.14)';
+    card.style.boxShadow = '';
+    card.classList.remove('is-live');
+    content.innerHTML = `<div class="no-scrim-state"><span class="no-scrim-icon">🎮</span><span>No scrim running — select a game mode below to start.</span></div>`;
+    document.getElementById('signups-card').style.display = 'none';
+    document.getElementById('missed-card').style.display = 'none';
+  }
+}
+
+function updateTimer() {
+  if (!cachedStatus?.active_scrim_started) return;
+  const diff = Math.max(0, Math.floor((Date.now() - new Date(cachedStatus.active_scrim_started + 'Z')) / 1000));
+  const h = String(Math.floor(diff / 3600)).padStart(2,'0');
+  const m = String(Math.floor((diff % 3600) / 60)).padStart(2,'0');
+  const sec = String(diff % 60).padStart(2,'0');
+  const el = document.getElementById('scrim-timer');
+  if (el) el.textContent = `${h}:${m}:${sec}`;
+}
+
+// ── Bot ───────────────────────────────────────────────────────────────
+async function toggleBot() {
+  if (cachedStatus?.running) {
+    await api('/api/bot/stop', 'POST'); toast('Bot stopped.');
+  } else {
+    const res = await api('/api/bot/start', 'POST');
+    if (res.error) { toast(res.error, true); document.querySelectorAll('.nav-tab')[2].click(); return; }
+    toast('Bot starting...');
+  }
+  setTimeout(updateStatus, 1800);
+}
+
+// ── Channels ──────────────────────────────────────────────────────────
+async function loadChannels() {
+  const sel = document.getElementById('channel-select');
+  const hint = document.getElementById('channel-hint');
+  const { channels = [] } = await api('/api/channels');
+  const current = cachedStatus?.scrim_channel_id || '';
+  if (!channels.length) { hint.textContent = cachedStatus?.running ? 'No channels — check guild ID' : 'Start bot to load channels'; return; }
+  hint.textContent = '';
+  sel.innerHTML = '<option value="">— select channel —</option>' +
+    channels.map(c => `<option value="${c.id}" ${c.id===current?'selected':''}>#${esc(c.name)}</option>`).join('');
+}
+async function saveChannel() {
+  await api('/api/settings', 'POST', { scrim_channel_id: document.getElementById('channel-select').value });
+  await updateStatus();
+}
+
+// ── Scrims ────────────────────────────────────────────────────────────
+async function startScrim(key) {
+  const res = await api('/api/scrim/start', 'POST', { key });
+  if (res.error) return toast(res.error, true);
+  toast(`${SCRIMS[key].emoji} ${SCRIMS[key].name} Scrims started!`);
+  await updateStatus();
+}
+async function concludeScrim() {
+  const res = await api('/api/scrim/conclude', 'POST');
+  if (res.error) return toast(res.error, true);
+  toast('Scrims concluded!'); await updateStatus();
+}
+
+// ── Players ───────────────────────────────────────────────────────────
+function renderPlayerList(listEl, countEl, players, emptyMsg) {
+  if (countEl) {
+    const prev = countEl.textContent;
+    countEl.textContent = players.length;
+    if (prev !== String(players.length)) {
+      countEl.classList.remove('badge-popping');
+      void countEl.offsetWidth;
+      countEl.classList.add('badge-popping');
+      setTimeout(() => countEl.classList.remove('badge-popping'), 400);
+    }
+  }
+  if (!listEl) return;
+  listEl.innerHTML = players.length
+    ? players.map((p,i) => `<div class="player-chip" style="animation-delay:${i*0.055}s"><span class="player-num">#${i+1}</span><strong>${esc(p.username)}</strong></div>`).join('')
+    : `<span style="color:var(--muted);font-size:.84rem">${emptyMsg}</span>`;
+}
+async function loadSignups() {
+  const { signups=[] } = await api('/api/signups');
+  renderPlayerList(document.getElementById('signup-list'), document.getElementById('signup-count-badge'), signups, 'Waiting for players to react ✋');
+  const { missed_signups=[] } = await api('/api/signups/missed');
+  renderPlayerList(document.getElementById('missed-list'), document.getElementById('missed-count-badge'), missed_signups, 'No missed sign-ups yet');
+}
+
+// ── Dispatch ──────────────────────────────────────────────────────────
+function openDispatchModal() { document.getElementById('dispatch-modal').style.display='flex'; setTimeout(()=>document.getElementById('match-code-input').focus(),50); }
+function closeDispatchModal() { document.getElementById('dispatch-modal').style.display='none'; document.getElementById('match-code-input').value=''; }
+async function submitDispatch() {
+  const code = document.getElementById('match-code-input').value.trim();
+  if (!code) return toast('Enter a match code first.', true);
+  const res = await api('/api/scrim/dispatch', 'POST', { match_code: code });
+  if (res.error) return toast(res.error, true);
+  closeDispatchModal(); toast('Dispatched! Animation playing in Discord...');
+  setTimeout(updateStatus, 1200);
+}
+async function endDispatch() {
+  const res = await api('/api/scrim/end-dispatch', 'POST');
+  if (res.error) return toast(res.error, true);
+  toast('Dispatch ended.'); await updateStatus();
+}
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') closeDispatchModal();
+  if (e.key==='Enter' && document.activeElement.id==='match-code-input') submitDispatch();
+});
+
+// ── Started / Announcement ────────────────────────────────────────────
+async function postStarted() {
+  const count = parseInt(document.getElementById('started-count')?.value||0);
+  const nextGameTime = document.getElementById('next-game-time')?.value||'';
+  const res = await api('/api/scrim/started', 'POST', { count, next_game_time: nextGameTime });
+  if (res.error) return toast(res.error, true);
+  toast(`Started!${count>0?' '+count+' players':''}`);
+}
+async function postAnnouncement() {
+  const res = await api('/api/schedule/post', 'POST', { scrim_key: cachedStatus?.active_scrim||null });
+  if (res.error) return toast(res.error, true); toast('Announcement posted!');
+}
+async function postNow() {
+  const res = await api('/api/schedule/post', 'POST', {});
+  if (res.error) return toast(res.error, true); toast('Schedule post sent!');
+}
+
+// ── Schedule countdown ────────────────────────────────────────────────
+function updateScheduleCountdown() {
+  const el = document.getElementById('sch-countdown');
+  if (!el) return;
+  const interval = parseInt(document.getElementById('sch-interval')?.value||30);
+  const [sh,sm] = (document.getElementById('sch-start-time')?.value||'00:00').split(':').map(Number);
+  const offset = (sh||0)*60+(sm||0);
+  const now = new Date();
+  const totalMins = now.getHours()*60+now.getMinutes();
+  const sinceMark = ((totalMins-offset)%interval+interval)%interval;
+  const totalSecs = interval*60 - (sinceMark*60+now.getSeconds());
+  el.textContent = String(Math.floor(totalSecs/60)).padStart(2,'0')+':'+String(totalSecs%60).padStart(2,'0');
+  document.getElementById('sch-interval-label').textContent = interval;
+  const mins = Math.floor(totalSecs/60);
+  el.style.background = mins>=5?'linear-gradient(135deg,#00D4FF,#00F5D4)':mins>=1?'linear-gradient(135deg,#FFA500,#FFB800)':'linear-gradient(135deg,#FF3366,#FF6B6B)';
+  el.style.webkitBackgroundClip='text'; el.style.webkitTextFillColor='transparent';
+}
+setInterval(updateScheduleCountdown,1000); updateScheduleCountdown();
+
+// ── Settings load/save ────────────────────────────────────────────────
+async function loadSettings() {
+  const s = await api('/api/settings');
+  ['s-prefix','s-cmd-concluded','s-cmd-started'].forEach(()=>{});
+  document.getElementById('s-prefix').value = s.command_prefix||'!';
+  document.getElementById('s-cmd-concluded').value = s.commands?.concluded||'concluded';
+  document.getElementById('s-cmd-started').value = s.commands?.started||'started';
+  document.getElementById('s-max-games').value = s.max_games??0;
+  document.getElementById('s-host').value = s.host_name||'';
+  document.getElementById('s-platforms').value = s.platforms||'';
+  document.getElementById('s-verify').checked = s.verification_required!==false;
+  Object.keys(SCRIMS).forEach(key=>{
+    const c=document.getElementById('s-cmd-'+key); if(c) c.value=s.commands?.[key]||'';
+    const m=document.getElementById('s-msg-'+key); if(m) m.value=s.start_messages?.[key]||'';
+  });
+  document.getElementById('s-line1').value=s.concluded_line1||'';
+  document.getElementById('s-line2').value=s.concluded_line2||'';
+  document.getElementById('s-line3').value=s.concluded_line3||'';
+  document.getElementById('s-invite').value=s.invite_link||'';
+}
+async function saveSettings() {
+  const commands={concluded:document.getElementById('s-cmd-concluded').value,started:document.getElementById('s-cmd-started').value};
+  const start_messages={};
+  Object.keys(SCRIMS).forEach(key=>{
+    const c=document.getElementById('s-cmd-'+key); if(c) commands[key]=c.value;
+    const m=document.getElementById('s-msg-'+key); if(m) start_messages[key]=m.value;
+  });
+  const res=await api('/api/settings','POST',{
+    command_prefix:document.getElementById('s-prefix').value,
+    max_games:parseInt(document.getElementById('s-max-games').value||0),
+    host_name:document.getElementById('s-host').value,
+    platforms:document.getElementById('s-platforms').value,
+    verification_required:document.getElementById('s-verify').checked,
+    commands,start_messages,
+    concluded_line1:document.getElementById('s-line1').value,
+    concluded_line2:document.getElementById('s-line2').value,
+    concluded_line3:document.getElementById('s-line3').value,
+    invite_link:document.getElementById('s-invite').value,
+  });
+  if(res.error) return toast(res.error,true);
+  toast('Settings saved!');
+  const n=document.getElementById('save-note');
+  n.style.display='inline'; setTimeout(()=>n.style.display='none',4000);
+}
+async function loadConfig() {
+  const s=await api('/api/settings');
+  document.getElementById('c-token').value=s.token||'';
+  document.getElementById('c-guild').value=s.guild_id||'';
+}
+async function saveConfig() {
+  const res=await api('/api/settings','POST',{token:document.getElementById('c-token').value,guild_id:document.getElementById('c-guild').value});
+  if(res.error) return toast(res.error,true);
+  toast('Config saved! Restart the bot.');
+  const n=document.getElementById('save-note2');
+  n.style.display='inline'; setTimeout(()=>n.style.display='none',4000);
+}
+function toggleEye(){const i=document.getElementById('c-token');i.type=i.type==='password'?'text':'password';}
+
+// ── Toast ─────────────────────────────────────────────────────────────
+function toast(msg,isErr=false){
+  const el=document.createElement('div');
+  el.className='toast'+(isErr?' err':''); el.textContent=msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{el.style.animation='tout .2s ease forwards';setTimeout(()=>el.remove(),200);},3200);
+}
+
+// ── Schedule settings ─────────────────────────────────────────────────
+async function loadScheduleChannels(){
+  const {channels=[]}=await api('/api/channels');
+  const s=await api('/api/settings');
+  const sel=document.getElementById('sch-channel');
+  if(sel) sel.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===s.schedule_channel_id?'selected':''}>#${esc(c.name)}</option>`).join('');
+  loadAlertChannels(channels);
+}
+async function loadAlertChannels(channels){
+  if(!channels){const d=await api('/api/channels');channels=d.channels||[];}
+  const sel=document.getElementById('alert-channel'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===cur?'selected':''}>#${esc(c.name)}</option>`).join('');
+  // Also populate announcement + invite channel pickers
+  const ann=document.getElementById('ann-channel');
+  if(ann){const annCur=ann.value;ann.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===annCur?'selected':''}>#${esc(c.name)}</option>`).join('');}
+  const inv=document.getElementById('invite-channel');
+  if(inv){const invCur=inv.value;inv.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===invCur?'selected':''}>#${esc(c.name)}</option>`).join('');}
+}
+async function loadAnnChannels(){
+  const {channels=[]}=await api('/api/channels');
+  const ann=document.getElementById('ann-channel');
+  if(ann){const cur=ann.value;ann.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===cur?'selected':''}>#${esc(c.name)}</option>`).join('');}
+}
+async function loadInviteChannels(){
+  const {channels=[]}=await api('/api/channels');
+  const sel=document.getElementById('invite-channel');
+  if(sel){const cur=sel.value;sel.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===cur?'selected':''}>#${esc(c.name)}</option>`).join('');}
+}
+async function postInvite(){
+  const channel_id=document.getElementById('invite-channel').value;
+  if(!channel_id) return toast('Pick a channel first.',true);
+  const res=await api('/api/post-invite','POST',{channel_id});
+  if(res.error) return toast(res.error,true);
+  toast('Invite posted!');
+}
+async function postScrimAnnouncement(){
+  const channel_id=document.getElementById('ann-channel').value;
+  const scrim_key=document.getElementById('ann-scrim-type').value;
+  const title=document.getElementById('ann-title').value.trim();
+  const start_time=document.getElementById('ann-time').value;
+  const message=document.getElementById('ann-message').value.trim();
+  const ping_everyone=document.getElementById('ann-ping').checked;
+  if(!channel_id) return toast('Pick a channel first.',true);
+  if(!start_time) return toast('Pick a start time.',true);
+  const res=await api('/api/scrim/announce','POST',{channel_id,scrim_key,title,start_time,message,ping_everyone});
+  if(res.error) return toast(res.error,true);
+  toast('Announcement posted!');
+}
+async function sendCodeAlert(minutes){
+  const channelId=document.getElementById('alert-channel').value;
+  if(!channelId) return toast('Pick a channel first.',true);
+  const res=await api('/api/code-alert','POST',{channel_id:channelId,minutes});
+  if(res.error) return toast(res.error,true);
+  toast(`Sent: CODE IN ${minutes} ${minutes===1?'MINUTE':'MINUTES'}`);
+}
+async function loadScheduleSettings(){
+  const s=await api('/api/settings');
+  const toggle=document.getElementById('sch-toggle');
+  if(toggle) toggle.checked=!!s.schedule_enabled;
+  applyToggle(!!s.schedule_enabled);
+  const intSel=document.getElementById('sch-interval'); if(intSel) intSel.value=s.schedule_interval||30;
+  const stEl=document.getElementById('sch-start-time'); if(stEl) stEl.value=s.schedule_start_time||'00:00';
+  const typeSel=document.getElementById('sch-scrim-type');
+  if(typeSel) typeSel.innerHTML=Object.entries(SCRIMS).map(([k,v])=>`<option value="${k}" ${k===s.schedule_scrim_type?'selected':''}>${v.emoji} ${v.name}</option>`).join('');
+  const links=document.getElementById('sch-links'); if(links) links.value=s.schedule_links||'';
+}
+function applyToggle(on){
+  const track=document.getElementById('sch-track');
+  const thumb=document.getElementById('sch-thumb');
+  const txt=document.getElementById('sch-status-text');
+  if(track){track.style.background=on?'rgba(0,212,255,.18)':'#0a1828';track.style.borderColor=on?'var(--accent)':'var(--border)';track.style.boxShadow=on?'0 0 16px rgba(0,212,255,.25)':'none';}
+  if(thumb){thumb.style.background=on?'var(--accent)':'var(--muted)';thumb.style.left=on?'28px':'3px';}
+  if(txt){txt.textContent=on?'Enabled':'Disabled';txt.style.color=on?'var(--green)':'var(--muted)';}
+}
+async function toggleSchedule(){
+  const on=document.getElementById('sch-toggle').checked; applyToggle(on);
+  await api('/api/settings','POST',{schedule_enabled:on}); toast(on?'Schedule enabled!':'Schedule disabled.');
+}
+async function saveScheduleSettings(){
+  await api('/api/settings','POST',{
+    schedule_channel_id:document.getElementById('sch-channel')?.value||'',
+    schedule_interval:parseInt(document.getElementById('sch-interval')?.value||30),
+    schedule_scrim_type:document.getElementById('sch-scrim-type')?.value||'solos',
+    schedule_start_time:document.getElementById('sch-start-time')?.value||'00:00',
+    schedule_links:document.getElementById('sch-links')?.value||'',
+  });
+  updateScheduleCountdown();
+}
+
+// ═══ SPLASH ════════════════════════════════════════════════════════════
+(function(){
+  const splash = document.createElement('div');
+  splash.id = 'splash';
+
+  // Rotating aurora
+  const aurora = document.createElement('div');
+  aurora.className = 'sp-aurora';
+  splash.appendChild(aurora);
+
+  // 4 wave layers
+  const wavesEl = document.createElement('div');
+  wavesEl.className = 'sp-waves';
+  for(let i=1;i<=4;i++){
+    const w=document.createElement('div');
+    w.className=`sp-wave sp-wave-${i}`;
+    wavesEl.appendChild(w);
+  }
+  splash.appendChild(wavesEl);
+
+  // Bubbles — negative delays so they're already mid-flight on load
+  for(let i=0;i<24;i++){
+    const b=document.createElement('div');
+    b.className='sp-bubble';
+    const size=4+Math.random()*24;
+    const left=2+Math.random()*96;
+    const dur=4+Math.random()*10;
+    const delay=Math.random()*10;
+    const drift=(Math.random()-.5)*90;
+    b.style.cssText=`width:${size}px;height:${size}px;left:${left}%;bottom:-${size}px;`+
+      `animation-duration:${dur}s;animation-delay:-${delay}s;--drift:${drift}px;`+
+      `opacity:${.45+Math.random()*.55}`;
+    splash.appendChild(b);
+  }
+
+  // Pulse rings — centred in the viewport, behind the logo
+  const ringWrap = document.createElement('div');
+  ringWrap.style.cssText='position:absolute;top:50%;left:50%;pointer-events:none;z-index:2';
+  for(let i=0;i<3;i++){
+    const r=document.createElement('div');
+    r.className='sp-ring';
+    ringWrap.appendChild(r);
+  }
+  splash.appendChild(ringWrap);
+
+  // Content
+  const inner = document.createElement('div');
+  inner.className = 'sp-inner';
+
+  const emoji = document.createElement('div');
+  emoji.className = 'sp-emoji';
+  emoji.textContent = '🌊';
+
+  const letters = document.createElement('div');
+  letters.className = 'sp-letters';
+  'OCEAN BOT'.split('').forEach((ch,i)=>{
+    if(ch===' '){const sp=document.createElement('span');sp.className='sp-space';letters.appendChild(sp);return;}
+    const s=document.createElement('span');s.className='sp-char';
+    s.style.animationDelay=`${0.1+i*0.062}s`;
+    s.textContent=ch;
+    letters.appendChild(s);
+  });
+
+  const tagline=document.createElement('div');
+  tagline.className='sp-tagline';
+  tagline.textContent='SCRIM MANAGEMENT SYSTEM';
+
+  const barWrap=document.createElement('div');barWrap.className='sp-bar-wrap';
+  const barFill=document.createElement('div');barFill.className='sp-bar-fill';barFill.id='sp-bar';
+  barWrap.appendChild(barFill);
+
+  const status=document.createElement('div');
+  status.className='sp-status';
+  status.textContent='Initializing...';
+
+  inner.append(emoji,letters,tagline,barWrap,status);
+  splash.appendChild(inner);
+  document.body.prepend(splash);
+
+  // Status messages — fade between each
+  const msgs=['Connecting to Discord...','Loading scrim data...','Almost ready...',''];
+  let mi=0;
+  const tick=()=>{
+    status.style.opacity='0';
+    setTimeout(()=>{status.textContent=msgs[mi]||'';status.style.opacity='1';},240);
+    mi++;
+    if(mi<msgs.length) setTimeout(tick,650);
+  };
+  setTimeout(tick,400);
+
+  // Fill bar
+  requestAnimationFrame(()=>setTimeout(()=>{barFill.style.width='100%';},130));
+
+  // Dismiss
+  setTimeout(()=>{
+    splash.classList.add('out');
+    setTimeout(()=>{
+      splash.remove();
+      const tb=document.querySelector('.topbar');
+      if(tb){tb.style.animation='none';void tb.offsetWidth;tb.style.animation='topbar-in .4s ease both';}
+      document.querySelectorAll('.page.active .card').forEach((c,i)=>{
+        c.style.animation='none';void c.offsetWidth;
+        c.style.animation=`card-in .35s ease ${0.07+i*.08}s both`;
+      });
+    },950);
+  },2700);
+})();
+
+// ═══ CLICK RIPPLE ═════════════════════════════════════════════════════
+document.addEventListener('click',e=>{
+  const el=e.target.closest('.btn,.scrim-btn,.nav-tab');
+  if(!el) return;
+  el.animate([{transform:'scale(1)'},{transform:'scale(.91)'},{transform:'scale(1)'}],{duration:160,easing:'ease'});
+  const rect=el.getBoundingClientRect();
+  const size=Math.max(rect.width,rect.height)*2.8;
+  const r=document.createElement('span');
+  r.style.cssText=`position:absolute;width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px;background:rgba(255,255,255,.12);border-radius:50%;transform:scale(0);animation:ripple .55s ease-out forwards;pointer-events:none;z-index:20`;
+  el.style.position='relative'; el.style.overflow='hidden';
+  el.appendChild(r); setTimeout(()=>r.remove(),600);
+},true);
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.scrim-btn');
+  if(!b) return;
+  const hex=b.dataset.color||'#00B4D8';
+  b.animate([{transform:'scale(1)'},{transform:'scale(.83)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:400,easing:'cubic-bezier(.34,1.56,.64,1)'});
+  b.animate([{boxShadow:`0 0 0 0 ${hex}80`},{boxShadow:`0 0 0 22px ${hex}00`}],{duration:550,easing:'ease-out'});
+});
+
+init();
+</script>
+</body>
+</html>
