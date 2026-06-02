@@ -1,7 +1,7 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect
 import discord
 from discord.ext import commands
-import json, os, threading, asyncio, logging
+import json, os, threading, asyncio, logging, secrets
 from datetime import datetime, timedelta
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
@@ -11,6 +11,11 @@ PORT = int(os.environ.get("PORT", 3000))
 ENV_TOKEN = os.environ.get("DISCORD_TOKEN", "")
 
 flask_app = Flask(__name__)
+flask_app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+
+LOGIN_USERNAME = os.environ.get("LOGIN_USERNAME", "cabz2x")
+LOGIN_PASSWORD = os.environ.get("LOGIN_PASSWORD", "")
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("DATA_DIR", BASE_DIR)
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
@@ -582,6 +587,30 @@ class BotManager:
 mgr = BotManager()
 
 # ── Flask routes ─────────────────────────────────────────────────────────────
+
+@flask_app.before_request
+def require_login():
+    if request.path.startswith("/static") or request.path == "/login":
+        return
+    if not session.get("logged_in"):
+        return redirect("/login")
+
+@flask_app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        u = request.form.get("username", "")
+        p = request.form.get("password", "")
+        if u == LOGIN_USERNAME and p == LOGIN_PASSWORD and LOGIN_PASSWORD:
+            session["logged_in"] = True
+            return redirect("/")
+        error = "Wrong username or password"
+    return render_template("login.html", error=error)
+
+@flask_app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect("/login")
 
 @flask_app.after_request
 def no_cache(r):
