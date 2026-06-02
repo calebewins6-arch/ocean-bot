@@ -1054,6 +1054,9 @@ def setup_host():
 
 if __name__ == "__main__":
     setup_host()
+    s = load_settings()
+    if s.get("token"):
+        mgr.start(s)
     print(f"Ocean Bot -> http://localhost:{PORT}/")
     def _open_browser():
         import time, webbrowser
