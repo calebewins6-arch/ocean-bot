@@ -1,5 +1,5 @@
 [deploy]
 startCommand = "python app.py"
-healthcheckPath = "/"
+healthcheckPath = "/login"
 healthcheckTimeout = 30
 restartPolicyType = "always"

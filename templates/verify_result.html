@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verification — Ocean Scrims</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#01080F;color:#BEE8FF;font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
+.card{background:rgba(4,16,36,.88);border:1px solid rgba(0,180,216,.2);border-radius:20px;padding:46px 42px;width:100%;max-width:420px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;box-shadow:0 20px 80px rgba(0,0,0,.7)}
+.icon{font-size:3.5rem}
+h1{font-size:1.3rem;font-weight:900;color:#fff}
+p{font-size:.86rem;color:#2E6880;line-height:1.6}
+.footer{font-size:.7rem;color:rgba(46,104,128,.5);margin-top:6px}
+.unlink-btn{background:none;border:1px solid rgba(255,51,102,.25);border-radius:8px;padding:9px 20px;color:rgba(255,51,102,.6);font-size:.78rem;cursor:pointer;transition:all .2s;margin-top:4px}
+.unlink-btn:hover{border-color:rgba(255,51,102,.6);color:#FF3366}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo" style="font-size:2rem">🌊</div>
+  {% if success %}
+    <div class="icon">✅</div>
+    <h1>Account Verified!</h1>
+    <p>You now have full access to scrim lobbies.<br>You can close this tab.</p>
+    {% if unlink_token %}
+    <button class="unlink-btn" onclick="unlinkAccount()">Unlink my account</button>
+    {% endif %}
+  {% else %}
+    <div class="icon">❌</div>
+    <h1>Link Expired</h1>
+    <p>{{ message }}</p>
+  {% endif %}
+  <div class="footer">🌊 Ocean Scrims  •  Epic Account Verification</div>
+</div>
+{% if unlink_token %}
+<script>
+async function unlinkAccount() {
+  if (!confirm('Are you sure you want to unlink your Epic account?')) return;
+  const res = await fetch('/unlink/{{ unlink_token }}/confirm', { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) {
+    document.querySelector('h1').textContent = 'Account Unlinked';
+    document.querySelector('p').textContent = 'Your Epic account has been unlinked.';
+    document.querySelector('.unlink-btn').style.display = 'none';
+    document.querySelector('.icon').textContent = '🔓';
+  }
+}
+</script>
+{% endif %}
+</body>
+</html>

@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ocean Bot — Login</title>
+<title>Ocean Bot — Create Account</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:#01080F;color:#BEE8FF;font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
 .card{background:rgba(4,16,36,.85);border:1px solid rgba(0,180,216,.2);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:20px}
 .logo{text-align:center;font-size:2rem}
 h1{text-align:center;font-size:1.25rem;color:#00D4FF;letter-spacing:.05em}
+.subtitle{text-align:center;font-size:.85rem;color:#2E6880}
 label{font-size:.8rem;color:#2E6880;margin-bottom:4px;display:block}
 input{width:100%;background:rgba(0,180,216,.07);border:1px solid rgba(0,180,216,.2);border-radius:8px;padding:10px 14px;color:#BEE8FF;font-size:1rem;outline:none}
 input:focus{border-color:#00D4FF}
@@ -22,19 +23,24 @@ button:hover{background:#00b8d9}
 <div class="card">
   <div class="logo">🌊</div>
   <h1>OCEAN BOT</h1>
+  <p class="subtitle">{% if is_update %}Update your account{% else %}Create your admin account{% endif %}</p>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
   <form method="POST" style="display:flex;flex-direction:column;gap:14px">
     <div>
       <label>Username</label>
-      <input type="text" name="username" placeholder="Enter username" autocomplete="username" required>
+      <input type="text" name="username" placeholder="Choose a username" autocomplete="username" required minlength="3">
     </div>
     <div>
       <label>Password</label>
-      <input type="password" name="password" placeholder="Enter password" autocomplete="current-password" required>
+      <input type="password" name="password" placeholder="Choose a password" autocomplete="new-password" required minlength="6">
     </div>
-    <button type="submit">LOGIN</button>
+    <div>
+      <label>Confirm Password</label>
+      <input type="password" name="confirm_password" placeholder="Repeat your password" autocomplete="new-password" required>
+    </div>
+    <button type="submit">{% if is_update %}UPDATE ACCOUNT{% else %}CREATE ACCOUNT{% endif %}</button>
   </form>
-  <a href="/signup" style="text-align:center;font-size:.84rem;color:#2E6880;text-decoration:none;display:block">No account? <span style="color:#00D4FF;font-weight:600">Create one →</span></a>
+  <a href="/login" style="text-align:center;font-size:.84rem;color:#2E6880;text-decoration:none;display:block">← Back to login</a>
 </div>
 </body>
 </html>

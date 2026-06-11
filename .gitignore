@@ -1,5 +1,6 @@
 settings.json
 leaderboard.json
+guilds/
 __pycache__/
 *.pyc
 *.pyo

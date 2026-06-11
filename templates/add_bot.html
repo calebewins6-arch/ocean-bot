@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Add Ocean Scrims Helper</title>
+<meta property="og:title" content="Ocean Scrims Helper">
+<meta property="og:description" content="The ultimate Fortnite scrim management bot. Add it to your server!">
+<meta property="og:type" content="website">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#01080F;color:#BEE8FF;font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
+.orb{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0}
+.orb1{width:600px;height:600px;background:rgba(0,55,150,.2);top:-5%;left:-15%;animation:drift 22s ease-in-out infinite alternate}
+.orb2{width:500px;height:500px;background:rgba(0,170,220,.09);bottom:-10%;right:-12%;animation:drift 28s ease-in-out infinite alternate-reverse}
+@keyframes drift{0%{transform:translate(0,0)}100%{transform:translate(30px,-40px)}}
+
+.card{
+  position:relative;z-index:1;
+  background:rgba(4,16,36,.92);
+  border:1px solid rgba(0,180,216,.22);
+  border-radius:24px;padding:52px 48px;
+  width:100%;max-width:480px;
+  display:flex;flex-direction:column;align-items:center;gap:24px;
+  text-align:center;
+  box-shadow:0 24px 80px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.04);
+  animation:up .5s cubic-bezier(.34,1.2,.64,1) both;
+}
+@keyframes up{from{opacity:0;transform:translateY(28px) scale(.96)}to{opacity:1;transform:none}}
+.card::before{content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.55),transparent)}
+
+.avatar{width:96px;height:96px;border-radius:50%;border:3px solid rgba(0,212,255,.35);
+  box-shadow:0 0 30px rgba(0,212,255,.25);object-fit:cover}
+.avatar-ph{width:96px;height:96px;border-radius:50%;border:3px solid rgba(0,212,255,.35);
+  background:rgba(0,212,255,.1);display:flex;align-items:center;justify-content:center;
+  font-size:2.8rem;box-shadow:0 0 30px rgba(0,212,255,.2)}
+
+.bot-name{font-size:1.6rem;font-weight:900;letter-spacing:.03em;
+  background:linear-gradient(135deg,#fff 0%,#00D4FF 50%,#7B8FFF 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+.badge{display:inline-flex;align-items:center;gap:6px;
+  background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);
+  border-radius:20px;padding:5px 14px;font-size:.78rem;font-weight:800;
+  color:#00D4FF;letter-spacing:.06em;text-transform:uppercase}
+
+.desc{font-size:.9rem;color:#2E6880;line-height:1.7;max-width:360px}
+
+.features{display:flex;flex-direction:column;gap:9px;width:100%;text-align:left}
+.feat{display:flex;align-items:center;gap:12px;
+  background:rgba(0,8,20,.5);border:1px solid rgba(0,180,216,.1);
+  border-radius:10px;padding:10px 16px;font-size:.84rem;font-weight:600}
+.feat-icon{font-size:1.1rem;flex-shrink:0}
+
+.btn-add{
+  display:flex;align-items:center;justify-content:center;gap:11px;
+  background:linear-gradient(135deg,#5865F2,#7289DA);
+  color:#fff;border:none;border-radius:14px;
+  padding:17px 36px;font-size:1.05rem;font-weight:900;
+  cursor:pointer;width:100%;letter-spacing:.04em;
+  box-shadow:0 8px 32px rgba(88,101,242,.5);
+  transition:filter .15s,transform .15s,box-shadow .15s;
+  text-decoration:none;
+}
+.btn-add:hover{filter:brightness(1.15);transform:translateY(-3px);box-shadow:0 14px 40px rgba(88,101,242,.7)}
+.btn-add:active{transform:translateY(0)}
+
+.btn-add.disabled{background:rgba(88,101,242,.3);cursor:not-allowed;box-shadow:none}
+.btn-add.disabled:hover{filter:none;transform:none}
+
+.footer{font-size:.7rem;color:rgba(46,104,128,.5)}
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="card">
+  {% if bot_avatar %}
+  <img class="avatar" src="{{ bot_avatar }}" alt="Bot avatar">
+  {% else %}
+  <div class="avatar-ph">🌊</div>
+  {% endif %}
+
+  <div>
+    <div class="bot-name">{{ bot_name or 'Ocean Scrims Helper' }}</div>
+    <div style="margin-top:10px">
+      <span class="badge">🤖 Bot  •  🌊 Ocean Scrims</span>
+    </div>
+  </div>
+
+  <p class="desc">The ultimate Fortnite scrim management bot. Handles sign-ups, match dispatch, scheduling, Epic verification and more.</p>
+
+  <div class="features">
+    <div class="feat"><span class="feat-icon">🔫</span> Solos, Duos, Trios, Squads & more</div>
+    <div class="feat"><span class="feat-icon">🚀</span> Match dispatch with animated codes</div>
+    <div class="feat"><span class="feat-icon">📅</span> Auto-schedule & countdown posts</div>
+    <div class="feat"><span class="feat-icon">✅</span> Epic Account verification</div>
+    <div class="feat"><span class="feat-icon">🎮</span> Auto-sets Fortnite nicknames</div>
+  </div>
+
+  {% if invite_url %}
+  <a class="btn-add" href="{{ invite_url }}" target="_blank">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+    + Add to Server
+  </a>
+  {% else %}
+  <span class="btn-add disabled">Bot offline — start the bot first</span>
+  {% endif %}
+
+  <div class="footer">🌊 Ocean Scrims  •  Share this page with anyone who wants to add the bot</div>
+</div>
+</body>
+</html>

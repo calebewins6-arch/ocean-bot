@@ -10,9 +10,9 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#01080F;--card:rgba(4,16,36,.75);
-  --border:rgba(0,180,216,.14);--accent:#00D4FF;
-  --text:#BEE8FF;--muted:#2E6880;
+  --bg:#010810;--card:rgba(3,12,26,.88);
+  --border:rgba(0,180,216,.16);--accent:#00D4FF;
+  --text:#C8EEFF;--muted:#2A6070;
   --green:#00FF94;--red:#FF3366;--gold:#FFB800;
   --purple:#8B5CF6;
 }
@@ -90,12 +90,23 @@ body{display:flex;flex-direction:column}
 /* ═══ TOPBAR ═════════════════════════════════════════════════════════ */
 .topbar{
   position:sticky;top:0;z-index:200;flex-shrink:0;
-  background:rgba(1,8,18,.94);
-  border-bottom:1px solid rgba(0,180,216,.12);
-  backdrop-filter:blur(28px);
-  box-shadow:0 1px 0 rgba(0,212,255,.06),0 8px 32px rgba(0,0,0,.6);
-  display:flex;align-items:center;padding:0 28px;height:60px;gap:6px;
+  background:rgba(1,8,18,.93);
+  border-bottom:1px solid rgba(0,180,216,.1);
+  backdrop-filter:blur(32px);
+  box-shadow:0 8px 40px rgba(0,0,0,.7);
+  display:flex;align-items:center;padding:0 28px;height:62px;gap:6px;
+  overflow:hidden;
 }
+/* Flowing rainbow line at topbar bottom */
+.topbar::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,#00D4FF 15%,#7B8FFF 35%,#BF5FFF 55%,#FF6BFF 70%,#BF5FFF 82%,#00D4FF 95%,transparent);
+  background-size:250% 100%;
+  animation:topbar-flow 5s linear infinite;
+  opacity:.85;
+}
+@keyframes topbar-flow{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
 .logo{
   font-size:1.1rem;font-weight:900;letter-spacing:.1em;white-space:nowrap;
   margin-right:14px;display:flex;align-items:center;gap:8px;
@@ -103,67 +114,86 @@ body{display:flex;flex-direction:column}
 .logo-wave{font-size:1.3rem;animation:wave-bob 3s ease-in-out infinite;will-change:transform;backface-visibility:hidden}
 @keyframes wave-bob{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
 .logo-text{
-  background:linear-gradient(135deg,#00D4FF 0%,#7B8CFF 50%,#BF5FFF 100%);
+  background:linear-gradient(90deg,#00D4FF,#9B6FFF,#FF6BFF,#9B6FFF,#00D4FF);
+  background-size:300% auto;
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  position:relative;
+  animation:logo-flow 5s linear infinite;
 }
-.logo-text::after{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.6) 50%,transparent 100%);
-  background-size:200% 100%;-webkit-background-clip:text;
-  animation:shimmer 4s ease infinite;
-}
-@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes logo-flow{0%{background-position:0% center}100%{background-position:300% center}}
 
-.nav-tabs{display:flex;gap:2px;flex:1}
+.nav-tabs{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+.nav-tabs::-webkit-scrollbar{display:none}
 .nav-tab{
-  padding:7px 18px;border:none;background:transparent;
-  color:var(--muted);font-size:.83rem;font-weight:700;cursor:pointer;
-  border-radius:7px;transition:all .16s;letter-spacing:.04em;text-transform:uppercase;
-  font-size:.75rem;
+  padding:7px 12px;border:none;background:transparent;
+  color:var(--muted);font-size:.75rem;font-weight:700;cursor:pointer;
+  border-radius:8px;transition:all .18s;letter-spacing:.03em;text-transform:uppercase;
+  position:relative;white-space:nowrap;flex-shrink:0;
 }
-.nav-tab:hover{color:var(--text);background:rgba(0,180,216,.08)}
-.nav-tab.active{color:var(--accent);background:rgba(0,212,255,.12);
-  box-shadow:0 0 0 1px rgba(0,212,255,.2) inset}
+.nav-tab:hover{color:var(--text);background:rgba(0,180,216,.1);text-shadow:0 0 12px rgba(0,212,255,.5)}
+.nav-tab.active{
+  color:var(--accent);background:rgba(0,212,255,.13);
+  box-shadow:0 0 0 1px rgba(0,212,255,.22) inset,0 0 20px rgba(0,212,255,.08);
+  text-shadow:0 0 14px rgba(0,212,255,.6);
+}
 
 .topbar-right{display:flex;align-items:center;gap:10px;margin-left:auto}
 .status-pill{
   display:flex;align-items:center;gap:7px;
-  background:rgba(0,0,0,.4);border:1px solid rgba(0,180,216,.18);
-  border-radius:20px;padding:5px 13px;font-size:.72rem;font-weight:800;letter-spacing:.06em;
-  backdrop-filter:blur(8px);
+  background:rgba(0,0,0,.45);border:1px solid rgba(0,180,216,.2);
+  border-radius:20px;padding:5px 14px;font-size:.72rem;font-weight:800;letter-spacing:.06em;
+  backdrop-filter:blur(10px);
+  transition:border-color .4s,box-shadow .4s,background .4s;
 }
-.dot{width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;transition:background .4s;will-change:transform,opacity;backface-visibility:hidden}
-.dot.online{background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse-dot 2s infinite}
-.dot.connecting{background:var(--gold);animation:pulse-dot 1s infinite}
-@keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.7}}
+.status-pill.is-online{
+  border-color:rgba(0,255,148,.38);
+  box-shadow:0 0 18px rgba(0,255,148,.15),0 0 0 1px rgba(0,255,148,.1) inset;
+  background:rgba(0,18,10,.6);
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;transition:background .4s,box-shadow .4s;will-change:transform,opacity;backface-visibility:hidden}
+.dot.online{background:var(--green);box-shadow:0 0 12px var(--green),0 0 26px rgba(0,255,148,.35);animation:pulse-dot 2s infinite}
+.dot.connecting{background:var(--gold);box-shadow:0 0 8px var(--gold);animation:pulse-dot .9s infinite}
+@keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.6);opacity:.65}}
 #bot-user{color:var(--muted);font-size:.74rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ═══ BUTTONS ════════════════════════════════════════════════════════ */
 .btn{
-  padding:9px 20px;border:none;border-radius:8px;cursor:pointer;
+  padding:9px 20px;border:none;border-radius:9px;cursor:pointer;
   font-weight:800;font-size:.82rem;letter-spacing:.04em;
-  transition:filter .15s,transform .15s,box-shadow .15s;
+  transition:filter .15s,transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s;
   position:relative;overflow:hidden;
   will-change:transform;backface-visibility:hidden;transform:translateZ(0);
 }
-.btn:hover{filter:brightness(1.2);transform:translateY(-2px)}
-.btn:active{transform:translateY(0);filter:brightness(.9)}
-.btn-primary{background:linear-gradient(135deg,#005B96,#0094CC,#00D4FF);color:#000;
-  box-shadow:0 4px 20px rgba(0,180,216,.35)}
-.btn-primary:hover{box-shadow:0 6px 30px rgba(0,212,255,.6)}
-.btn-danger{background:linear-gradient(135deg,#8B0020,#FF3366);color:#fff;
-  box-shadow:0 4px 18px rgba(255,51,102,.3)}
-.btn-ghost{background:rgba(0,180,216,.1);color:var(--accent);
-  border:1px solid rgba(0,180,216,.22)}
-.btn-ghost:hover{background:rgba(0,180,216,.2);box-shadow:0 0 20px rgba(0,212,255,.15)}
+/* Shine sweep on hover */
+.btn::after{
+  content:'';position:absolute;top:0;left:-70%;width:45%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);
+  transform:skewX(-20deg);transition:left .4s ease;
+}
+.btn:hover::after{left:130%}
+.btn:hover{filter:brightness(1.18);transform:translateY(-3px) scale(1.03)}
+.btn:active{transform:translateY(0) scale(.97);filter:brightness(.88)}
+.btn-primary{
+  background:linear-gradient(135deg,#004080,#0080C8,#00C8FF);color:#000;font-weight:900;
+  box-shadow:0 4px 22px rgba(0,180,216,.45),0 0 0 1px rgba(0,212,255,.2) inset;
+}
+.btn-primary:hover{box-shadow:0 8px 36px rgba(0,212,255,.7),0 0 0 1px rgba(0,212,255,.4) inset}
+.btn-danger{
+  background:linear-gradient(135deg,#700020,#CC0038,#FF3366);color:#fff;
+  box-shadow:0 4px 20px rgba(255,51,102,.4);
+}
+.btn-danger:hover{box-shadow:0 8px 32px rgba(255,51,102,.7)}
+.btn-ghost{
+  background:rgba(0,180,216,.1);color:var(--accent);
+  border:1px solid rgba(0,180,216,.25);
+}
+.btn-ghost:hover{background:rgba(0,180,216,.22);box-shadow:0 0 24px rgba(0,212,255,.22);border-color:rgba(0,212,255,.45)}
 .btn-sm{padding:7px 14px;font-size:.77rem}
 .btn-conclude{
-  background:linear-gradient(135deg,#6B0020,#C0002A,#FF3366);
+  background:linear-gradient(135deg,#500018,#A80030,#FF1A4A,#FF3366);
   color:#fff;padding:11px 24px;font-size:.88rem;font-weight:900;
-  box-shadow:0 4px 24px rgba(255,51,102,.4);letter-spacing:.05em;
+  box-shadow:0 4px 26px rgba(255,51,102,.5),0 0 0 1px rgba(255,80,80,.12) inset;letter-spacing:.05em;
 }
-.btn-conclude:hover{box-shadow:0 8px 36px rgba(255,51,102,.65)}
+.btn-conclude:hover{box-shadow:0 10px 42px rgba(255,51,102,.8),0 0 0 1px rgba(255,120,120,.2) inset}
 
 /* ═══ PAGE / LAYOUT ══════════════════════════════════════════════════ */
 .page{display:none;padding:24px 28px;flex:1;overflow-y:auto;position:relative;z-index:1}
@@ -173,21 +203,28 @@ body{display:flex;flex-direction:column}
 .card{
   background:var(--card);
   border:1px solid var(--border);
-  border-radius:16px;padding:22px 24px;margin-bottom:18px;
-  backdrop-filter:blur(24px);
-  box-shadow:0 8px 40px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.04);
+  border-radius:18px;padding:24px 26px;margin-bottom:18px;
+  backdrop-filter:blur(28px);
+  box-shadow:0 8px 48px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);
   position:relative;overflow:hidden;
+  transition:transform .22s ease,box-shadow .22s ease,border-color .28s;
 }
+.card:hover{transform:translateY(-3px);box-shadow:0 16px 64px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.07)}
+/* Animated multi-colour shimmer across top */
 .card::before{
-  content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(0,212,255,.45),transparent);
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,#00D4FF 25%,#8B5FFF 55%,#FF6BFF 78%,transparent);
+  background-size:300% 100%;
+  animation:card-shimmer 6s linear infinite;
+  opacity:.7;
 }
+@keyframes card-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .card-title{
   font-size:.65rem;font-weight:900;letter-spacing:.18em;
   color:var(--accent);text-transform:uppercase;margin-bottom:16px;
   display:flex;align-items:center;gap:10px;
 }
-.card-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(0,212,255,.2),transparent)}
+.card-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(0,212,255,.3),rgba(139,95,255,.15),transparent)}
 
 /* ═══ ACTIVE SCRIM HERO ══════════════════════════════════════════════ */
 #active-card{transition:border-color .5s,box-shadow .5s}
@@ -266,49 +303,49 @@ select:focus,select:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0
 .scrim-btn{
   position:relative;overflow:hidden;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:8px;padding:22px 10px 18px;border-radius:14px;
-  border:1px solid var(--btn-border,rgba(255,255,255,.08));
-  background:var(--btn-bg,rgba(0,15,35,.9));
+  gap:8px;padding:24px 10px 18px;border-radius:16px;
+  border:1px solid var(--btn-border,rgba(255,255,255,.09));
+  background:var(--btn-bg,rgba(0,12,32,.95));
   cursor:pointer;color:var(--text);
-  transition:transform .22s cubic-bezier(.34,1.56,.64,1),
-    box-shadow .25s,border-color .25s;
-  min-height:125px;
+  transition:transform .26s cubic-bezier(.34,1.56,.64,1),box-shadow .28s,border-color .28s;
+  min-height:130px;
   will-change:transform;backface-visibility:hidden;transform:translateZ(0);
-  box-shadow:var(--btn-inset-glow,none),0 4px 20px rgba(0,0,0,.5);
+  box-shadow:var(--btn-inset-glow,none),0 4px 22px rgba(0,0,0,.55);
 }
-/* top inner colour line always visible */
-.scrim-btn::after{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--btn-color,rgba(0,212,255,.6)),transparent);
-  opacity:.55;transition:opacity .25s;
-}
-.scrim-btn:hover::after{opacity:1}
-/* radial glow from top — partially visible idle, full on hover */
+/* Radial top glow */
 .scrim-btn::before{
   content:'';position:absolute;inset:0;
-  opacity:.35;transition:opacity .28s;
-  background:radial-gradient(ellipse at 50% -10%,var(--btn-top-glow,rgba(0,212,255,.35)),transparent 62%);
+  opacity:.38;transition:opacity .3s;
+  background:radial-gradient(ellipse at 50% -5%,var(--btn-top-glow,rgba(0,212,255,.4)),transparent 65%);
+}
+/* Top colour line */
+.scrim-btn::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--btn-color,rgba(0,212,255,.7)),transparent);
+  opacity:.55;transition:opacity .28s,height .28s;
 }
 .scrim-btn:hover{
-  transform:translateY(-6px) scale(1.03);
-  box-shadow:var(--btn-inset-glow,none),0 18px 50px var(--btn-shadow,rgba(0,212,255,.28)),
-    0 0 0 1px var(--btn-border-h,rgba(0,212,255,.5));
-  border-color:var(--btn-border-h,rgba(0,212,255,.5));
+  transform:translateY(-8px) scale(1.04);
+  box-shadow:var(--btn-inset-glow,none),
+    0 22px 55px var(--btn-shadow,rgba(0,212,255,.32)),
+    0 0 0 1px var(--btn-border-h,rgba(0,212,255,.6));
+  border-color:var(--btn-border-h,rgba(0,212,255,.6));
 }
 .scrim-btn:hover::before{opacity:1}
-.scrim-btn.active-type{opacity:.35;cursor:default;pointer-events:none}
+.scrim-btn:hover::after{opacity:1;height:3px}
+.scrim-btn.active-type{opacity:.3;cursor:default;pointer-events:none}
 .scrim-btn .mode-emoji{
-  font-size:2.2rem;
-  transition:transform .2s,filter .2s;
-  filter:drop-shadow(0 0 8px var(--btn-color,rgba(0,212,255,.6)));
+  font-size:2.3rem;
+  transition:transform .22s,filter .22s;
+  filter:drop-shadow(0 0 10px var(--btn-color,rgba(0,212,255,.7)));
 }
-.scrim-btn:hover .mode-emoji{transform:scale(1.28);filter:drop-shadow(0 0 20px var(--btn-color,rgba(0,212,255,.95)))}
-.scrim-btn .mode-name{font-size:.78rem;font-weight:800;letter-spacing:.02em;text-align:center;line-height:1.2}
+.scrim-btn:hover .mode-emoji{transform:scale(1.35);filter:drop-shadow(0 0 24px var(--btn-color,rgba(0,212,255,.98)))}
+.scrim-btn .mode-name{font-size:.79rem;font-weight:900;letter-spacing:.02em;text-align:center;line-height:1.2}
 .scrim-btn .mode-party{
   font-size:.62rem;font-weight:700;letter-spacing:.08em;
   color:var(--btn-color,var(--muted));
-  background:rgba(0,0,0,.35);border:1px solid var(--btn-border,rgba(255,255,255,.06));
-  border-radius:10px;padding:2px 8px;margin-top:2px;
+  background:rgba(0,0,0,.4);border:1px solid var(--btn-border,rgba(255,255,255,.07));
+  border-radius:10px;padding:2px 9px;margin-top:2px;
 }
 
 /* ═══ PLAYER LIST ════════════════════════════════════════════════════ */
@@ -529,54 +566,45 @@ code{
 
 /* ═══ ENHANCED ANIMATIONS ════════════════════════════════════════════ */
 
-/* Cards lift on hover + hairline pulses */
-.card{transition:transform .22s ease,box-shadow .22s ease,border-color .25s ease}
-.card:hover{transform:translateY(-3px)}
-.card::before{animation:hairline-pulse 4s ease-in-out infinite}
-@keyframes hairline-pulse{
-  0%,100%{left:12%;right:12%;opacity:.45}
-  50%{left:4%;right:4%;opacity:1}
-}
-
 /* Channel card hover */
 .channel-card{transition:border-color .22s,box-shadow .22s}
-.channel-card:hover{border-color:rgba(0,212,255,.3);box-shadow:0 0 24px rgba(0,212,255,.07)}
+.channel-card:hover{border-color:rgba(0,212,255,.3);box-shadow:0 0 28px rgba(0,212,255,.09)}
 
 /* Section divider line breathes */
 .section-divider::before,.section-divider::after{
-  animation:divider-breathe 3s ease-in-out infinite alternate;
+  animation:divider-breathe 3.5s ease-in-out infinite alternate;
 }
-@keyframes divider-breathe{from{opacity:.3;transform:scaleX(.6)}to{opacity:1;transform:scaleX(1)}}
+@keyframes divider-breathe{from{opacity:.28;transform:scaleX(.55)}to{opacity:1;transform:scaleX(1)}}
 
 /* No-scrim icon floats */
-.no-scrim-icon{animation:icon-float 3.5s ease-in-out infinite}
+.no-scrim-icon{animation:icon-float 3.8s ease-in-out infinite}
 @keyframes icon-float{
   0%,100%{transform:translateY(0) rotate(-6deg)}
-  50%{transform:translateY(-10px) rotate(6deg)}
+  50%{transform:translateY(-11px) rotate(6deg)}
 }
 
-/* Scrim mode buttons — idle emoji float, staggered per-button */
+/* Scrim mode buttons — idle emoji float, staggered */
 .scrim-btn .mode-emoji{animation:emoji-float 3.5s ease-in-out infinite}
-@keyframes emoji-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-.scrim-btn:hover .mode-emoji{animation:none;transform:scale(1.28)}
+@keyframes emoji-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.scrim-btn:hover .mode-emoji{animation:none;transform:scale(1.35)}
 
 /* Active scrim border breathes */
-#active-card.is-live{animation:live-glow 2.5s ease-in-out infinite}
+#active-card.is-live{animation:live-glow 2.8s ease-in-out infinite}
 @keyframes live-glow{
-  0%,100%{box-shadow:0 0 30px var(--live-c,rgba(0,212,255,.12)),0 8px 40px rgba(0,0,0,.6)}
-  50%{box-shadow:0 0 60px var(--live-c,rgba(0,212,255,.28)),0 8px 40px rgba(0,0,0,.6)}
+  0%,100%{box-shadow:0 0 32px var(--live-c,rgba(0,212,255,.14)),0 8px 48px rgba(0,0,0,.6)}
+  50%{box-shadow:0 0 72px var(--live-c,rgba(0,212,255,.34)),0 8px 48px rgba(0,0,0,.6)}
 }
 
 /* Hero live badge breathes */
-.hero-badge{animation:badge-breathe 2.2s ease-in-out infinite}
+.hero-badge{animation:badge-breathe 2.4s ease-in-out infinite}
 @keyframes badge-breathe{
   0%,100%{box-shadow:0 0 0 0 transparent}
-  50%{box-shadow:0 0 0 5px rgba(255,255,255,.06)}
+  50%{box-shadow:0 0 0 6px rgba(255,255,255,.06)}
 }
 
 /* Hero timer ticks */
 .hero-timer{animation:timer-tick 1s step-end infinite}
-@keyframes timer-tick{0%{opacity:1}45%{opacity:1}50%{opacity:.45}95%{opacity:.45}100%{opacity:1}}
+@keyframes timer-tick{0%{opacity:1}45%{opacity:1}50%{opacity:.38}95%{opacity:.38}100%{opacity:1}}
 
 /* Stat pills pop in */
 @keyframes stat-pop{from{opacity:0;transform:scale(.6) translateY(6px)}to{opacity:1;transform:none}}
@@ -586,16 +614,18 @@ code{
 /* Player chips cascade in */
 @keyframes chip-in{from{opacity:0;transform:translateY(10px) scale(.88)}to{opacity:1;transform:none}}
 .player-chip{animation:chip-in .22s cubic-bezier(.34,1.56,.64,1) both}
+.player-chip:hover{border-color:rgba(0,212,255,.35);box-shadow:0 0 16px rgba(0,212,255,.1)}
 
 /* Count badge pops when it changes */
-@keyframes badge-pop{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}
-.badge-popping{animation:badge-pop .35s cubic-bezier(.34,1.56,.64,1)}
+@keyframes badge-pop{0%{transform:scale(1)}40%{transform:scale(1.45)}100%{transform:scale(1)}}
+.badge-popping{animation:badge-pop .38s cubic-bezier(.34,1.56,.64,1)}
 
-/* Nav tab underline slides in */
+/* Nav tab active line */
 .nav-tab.active::after{
-  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  content:'';position:absolute;bottom:0;left:10%;right:10%;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),#8B5FFF,transparent);
   animation:tab-line-slide .25s ease both;border-radius:2px;
+  box-shadow:0 0 10px var(--accent);
 }
 @keyframes tab-line-slide{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
 
@@ -603,25 +633,64 @@ code{
 .toast{animation:toast-bounce .3s cubic-bezier(.34,1.56,.64,1) both}
 @keyframes toast-bounce{from{transform:translateX(120%) scale(.8) rotate(3deg);opacity:0}to{transform:none;opacity:1}}
 
-/* Dispatch modal pops in */
-#dispatch-modal > div{animation:modal-pop .28s cubic-bezier(.34,1.56,.64,1) both}
-@keyframes modal-pop{from{transform:scale(.82) translateY(24px);opacity:0}to{transform:none;opacity:1}}
+/* Dispatch modal pops in + siren border */
+@keyframes modal-pop{from{transform:scale(.82) translateY(28px);opacity:0}to{transform:none;opacity:1}}
+@keyframes dispatch-border{
+  0%,100%{outline-color:rgba(255,60,0,.75)}
+  50%{outline-color:rgba(30,100,255,.75)}
+}
+#dispatch-modal > div{
+  animation:modal-pop .28s cubic-bezier(.34,1.56,.64,1) both,
+            dispatch-border 1.0s ease-in-out .3s infinite;
+  outline:2px solid rgba(255,60,0,.75);
+  outline-offset:0;
+}
 
-/* Logo text shimmer sweep */
-.logo-text::after{animation:logo-shimmer 5s ease infinite}
-@keyframes logo-shimmer{0%,100%{background-position:200% 0}50%{background-position:-200% 0}}
+/* Siren flashing emoji */
+@keyframes siren-flash{
+  0%,44%{filter:drop-shadow(0 0 10px #ff2200)}
+  45%,100%{filter:drop-shadow(0 0 10px #1155ff)}
+}
+.siren{display:inline-block;animation:siren-flash .52s steps(1,end) infinite}
+
+/* ═══ TOUCH / IPAD — SPLASH PERFORMANCE ══════════════════════════════ */
+@media (pointer: coarse) {
+  /* Exit: drop filter:brightness which forces a full-screen repaint */
+  @keyframes splash-out{
+    0%  {opacity:1;transform:scale(1)}
+    100%{opacity:0;transform:scale(1.06)}
+  }
+  /* Emoji entrance: remove animated blur — opacity+transform only */
+  @keyframes emoji-zoom{
+    0%  {opacity:0;transform:scale(3) rotate(-18deg)}
+    100%{opacity:1;transform:scale(1) rotate(0deg)}
+  }
+  /* Letter entrance: remove animated blur */
+  @keyframes char-slam{
+    0%  {opacity:0;transform:translateY(-60px) scale(.2)}
+    100%{opacity:1;transform:none}
+  }
+  /* Smaller, lighter aurora ring */
+  .sp-aurora{width:480px;height:480px;filter:blur(28px)}
+  /* Drop the two faintest wave layers to halve rotating-element count */
+  .sp-wave-3,.sp-wave-4{display:none}
+  /* Reduce background orb blur cost */
+  .orb{filter:blur(50px)}
+}
 </style>
 </head>
 <body>
 
 <!-- Ocean night background -->
 <div class="bg-banner"></div>
+<canvas id="stars-canvas" style="position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.7"></canvas>
 <div class="bg-aurora">
   <div class="orb-moon"></div>
   <div class="orb-deep"></div>
   <div class="orb orb-1"></div>
   <div class="orb orb-2"></div>
   <div class="orb orb-3"></div>
+  <div class="orb orb-4"></div>
 </div>
 <div class="bg-water"></div>
 <div class="bg-grid"></div>
@@ -635,16 +704,20 @@ code{
   <nav class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('dashboard',this)">Dashboard</button>
     <button class="nav-tab" onclick="showPage('schedule',this)">Schedule</button>
+    <button class="nav-tab" onclick="showPage('verify',this)">Verify</button>
     <button class="nav-tab" onclick="showPage('settings',this)">Settings</button>
     <button class="nav-tab" onclick="showPage('config',this)">Config</button>
+    <button class="nav-tab" onclick="showPage('leaderboard',this)">🏆 Leaderboard</button>
   </nav>
   <div class="topbar-right">
-    <div class="status-pill">
+    <div class="status-pill" id="status-pill">
       <div class="dot" id="dot"></div>
       <span id="status-text">OFFLINE</span>
     </div>
     <span id="bot-user"></span>
+    <button class="btn btn-ghost btn-sm" onclick="inviteBot()" title="Add bot to another server" style="white-space:nowrap">➕ Invite Bot</button>
     <button class="btn btn-primary btn-sm" id="toggle-btn" onclick="toggleBot()">Start Bot</button>
+    <form method="POST" action="/logout" style="margin:0"><button type="submit" class="btn btn-ghost btn-sm" style="color:#FF6B6B;border-color:rgba(255,107,107,.3)" title="Log out">⎋ Logout</button></form>
   </div>
 </header>
 
@@ -691,25 +764,28 @@ code{
     </div>
   </div>
 
-  <!-- Invite Card -->
-  <div class="card" style="border-color:rgba(0,212,255,.28);box-shadow:0 0 24px rgba(0,212,255,.06)">
-    <div class="card-title">🌊 Invite to Server</div>
-    <p style="font-size:.83rem;color:var(--muted);margin-bottom:18px;line-height:1.6">Post an @everyone invite embed to any channel so players can join your Discord server.</p>
-    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-      <div class="fg" style="flex:1;min-width:200px">
+  <!-- Open Leaderboard -->
+  <div class="card" style="border-color:rgba(255,184,0,.25);box-shadow:0 0 24px rgba(255,184,0,.06)">
+    <div class="card-title" style="color:var(--gold)">🏆 Post Open Leaderboard</div>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:18px;line-height:1.6">Post the leaderboard standings embed to your open-leaderboards channel.</p>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div class="fg">
         <label>Post Channel</label>
         <div style="display:flex;gap:8px">
-          <select id="invite-channel" style="flex:1"><option value="">— select channel —</option></select>
-          <button class="btn btn-ghost btn-sm" onclick="loadInviteChannels()">↻</button>
+          <select id="lb-channel" style="flex:1"><option value="">— select channel —</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadLbChannels()">↻</button>
         </div>
       </div>
-      <button class="btn btn-sm" style="background:linear-gradient(135deg,#005B96,#0094CC,#00D4FF);color:#000;font-weight:900;padding:10px 22px;box-shadow:0 4px 18px rgba(0,180,216,.35);white-space:nowrap" onclick="postInvite()">🌊 Post Invite</button>
+      <div class="fg">
+        <label>Game Mode</label>
+        <select id="lb-mode"><option value="">All Modes</option></select>
+      </div>
     </div>
-    <div class="hint" style="margin-top:10px">Make sure your invite link is set in <strong style="color:var(--text)">Settings → Invite Link</strong> first.</div>
+    <button class="btn btn-sm" style="background:linear-gradient(135deg,#7A5800,#C8900A,#FFB800);color:#000;font-weight:900;padding:10px 22px;box-shadow:0 4px 18px rgba(255,184,0,.3)" onclick="postLeaderboard()">🏆 Post Leaderboard</button>
   </div>
 
   <!-- Scrim Announcement -->
-  <div class="card" style="border-color:rgba(255,184,0,.2);box-shadow:0 0 24px rgba(255,184,0,.05)">
+  <div class="card" data-admin-only style="border-color:rgba(255,184,0,.2);box-shadow:0 0 24px rgba(255,184,0,.05)">
     <div class="card-title" style="color:var(--gold)">📢 Scrim Announcement</div>
     <p style="font-size:.83rem;color:var(--muted);margin-bottom:18px;line-height:1.6">Post a timed announcement with Discord's live countdown — shows the start time and how long until it begins.</p>
     <div class="form-grid" style="margin-bottom:14px">
@@ -897,6 +973,15 @@ code{
       </div>
     </div>
     <div class="settings-section">
+      <h3>Scrim Priority Roles</h3>
+      <p style="font-size:.8rem;color:var(--muted);line-height:1.6;margin-bottom:14px">These role tiers appear in the sign-up embed. Click <strong style="color:var(--text)">↻ Reload Roles</strong> to pull roles from your server (bot must be online), then add tiers and save.</p>
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="reloadGuildRoles()">↻ Reload Roles</button>
+        <button class="btn btn-ghost btn-sm" onclick="addPriorityTier()" style="color:#a78bfa;border-color:rgba(139,92,246,.3)">+ Add Tier</button>
+      </div>
+      <div id="priority-tiers" style="margin-bottom:14px"></div>
+    </div>
+    <div class="settings-section">
       <h3>Commands</h3>
       <div class="form-grid cols3">
         <div class="fg"><label>Prefix</label><input type="text" id="s-prefix" placeholder="!" maxlength="3" style="max-width:70px"></div>
@@ -919,15 +1004,173 @@ code{
       <h3>Start Messages</h3>
       <div class="form-grid cols1" id="start-msgs"></div>
     </div>
+    <div class="settings-section">
+      <h3>🚨 Dispatch Embed</h3>
+      <p style="font-size:.8rem;color:var(--muted);line-height:1.6;margin-bottom:14px">
+        Customise what the dispatch embed looks like in Discord. Supports animated emojis — paste the Discord syntax e.g. <code style="background:rgba(0,180,216,.12);padding:1px 5px;border-radius:4px">&lt;a:emoji_name:emoji_id&gt;</code>.
+      </p>
+      <div class="form-grid cols1">
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div class="fg" style="flex:1;min-width:120px">
+            <label>Title Prefix <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(before scrim name)</span></label>
+            <input type="text" id="s-dp-prefix" placeholder="🚨">
+          </div>
+          <div class="fg" style="flex:1;min-width:120px">
+            <label>Title Suffix <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(after scrim name)</span></label>
+            <input type="text" id="s-dp-suffix" placeholder="🚨">
+          </div>
+        </div>
+        <div class="fg">
+          <label>Intro Line</label>
+          <input type="text" id="s-dp-intro" placeholder="**The lobby is live — get in!**">
+        </div>
+        <div class="fg">
+          <label>Missed Queue Line</label>
+          <input type="text" id="s-dp-missed" placeholder="🟥  **Missed queue?** — React ✋ below to sign up late">
+        </div>
+        <div class="fg">
+          <label>Already Signed Up Line</label>
+          <input type="text" id="s-dp-signed" placeholder="⭕  **Already signed up?** — Ignore this message">
+        </div>
+      </div>
+    </div>
     <div class="save-bar">
       <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
       <span id="save-note">Restart bot to apply command changes.</span>
     </div>
   </div>
+
+  <!-- Account management -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-title" style="margin-bottom:18px">🔐 Account</div>
+    <div class="settings-section" style="margin-bottom:0">
+      <div class="form-grid cols1" style="max-width:380px">
+        <div class="fg">
+          <label>Username</label>
+          <input type="text" id="acc-username" placeholder="Enter username" autocomplete="username">
+        </div>
+        <div class="fg">
+          <label>New Password <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(leave blank to keep current)</span></label>
+          <input type="password" id="acc-password" placeholder="New password" autocomplete="new-password">
+        </div>
+        <div class="fg">
+          <label>Confirm Password</label>
+          <input type="password" id="acc-confirm" placeholder="Repeat new password" autocomplete="new-password">
+        </div>
+      </div>
+    </div>
+    <div class="save-bar">
+      <button class="btn btn-primary" onclick="saveAccount()">Update Account</button>
+      <span id="acc-note" style="font-size:.78rem;color:var(--muted);display:none">Account updated!</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ VERIFY ══════════════ -->
+<div class="page" id="page-verify">
+
+  <!-- Preview embed -->
+  <div class="card" style="border-color:rgba(0,180,216,.35);box-shadow:0 0 28px rgba(0,180,216,.08)">
+    <div class="card-title">🖐️ Epic Account Verification</div>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:20px;line-height:1.6">
+      Post a verification embed in your Discord server. When members click the button the bot will DM them your configured link — perfect for linking Fortnite / Epic accounts before scrims.
+    </p>
+
+    <!-- Discord-style embed preview -->
+    <div style="background:#2b2d31;border-radius:8px;border-left:4px solid #00B4D8;padding:16px 18px;margin-bottom:22px;max-width:520px;font-family:'gg sans','Noto Sans',sans-serif">
+      <div style="font-size:.95rem;font-weight:700;color:#f2f3f5;margin-bottom:8px">Epic Account Verification</div>
+      <div style="font-size:.85rem;color:#dbdee1;line-height:1.55;margin-bottom:14px">
+        Please click on the raised hand below to link your Epic Account. You will receive a direct message from the bot with further instructions.
+      </div>
+      <div style="font-size:.73rem;color:#80848e;border-top:1px solid rgba(255,255,255,.07);padding-top:10px;margin-bottom:14px">🌊 Ocean Scrims</div>
+      <div style="display:inline-flex;align-items:center;gap:7px;background:#5865F2;border-radius:4px;padding:8px 16px;font-size:.86rem;font-weight:600;color:#fff">
+        🖐️ Link Epic Account
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div class="fg" style="flex:1;min-width:200px">
+        <label>Post Channel</label>
+        <div style="display:flex;gap:8px">
+          <select id="verify-channel" style="flex:1"><option value="">— select channel —</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadVerifyChannels()">↻</button>
+        </div>
+      </div>
+      <button class="btn btn-sm" onclick="postVerifyEmbed()" style="background:linear-gradient(135deg,#3B4BC8,#5865F2,#7289DA);color:#fff;font-weight:900;padding:11px 24px;box-shadow:0 4px 18px rgba(88,101,242,.4);white-space:nowrap">🖐️ Post Verify Embed</button>
+    </div>
+  </div>
+
+  <!-- Verified users list -->
+  <div class="card" style="border-color:rgba(0,255,148,.18);box-shadow:0 0 24px rgba(0,255,148,.05)">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span style="color:var(--green)">✅ Verified Members</span>
+      <span id="verified-count-badge" class="count-badge" style="background:rgba(0,255,148,.1);border-color:rgba(0,255,148,.25);color:var(--green)">0</span>
+    </div>
+    <div id="verified-list" class="player-grid">
+      <span style="color:var(--muted);font-size:.84rem">No verified members yet.</span>
+    </div>
+  </div>
+
+  <!-- Verify settings -->
+  <div class="card">
+    <div class="card-title">Verify Settings</div>
+    <div class="hint" style="padding:10px 14px;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.12);border-radius:8px;font-size:.8rem;line-height:1.6">
+      ⚙️  Configure your <strong style="color:var(--text)">Epic Client ID / Secret</strong> and <strong style="color:var(--text)">Base URL</strong> in the <strong style="color:var(--accent)">Config</strong> tab before posting the verify embed.
+    </div>
+    <div class="save-bar">
+      <button class="btn btn-primary" onclick="saveVerifySettings()">Save</button>
+      <span id="save-note-verify" style="font-size:.78rem;color:var(--muted);display:none">Saved!</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════ LEADERBOARD ══════════════ -->
+<div class="page" id="page-leaderboard">
+  <div class="card" style="border-color:rgba(255,184,0,.25);box-shadow:0 0 24px rgba(255,184,0,.06)">
+    <div class="card-title" style="color:var(--gold)">🏆 Post Open Leaderboard</div>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:18px;line-height:1.6">Post the leaderboard standings embed to your open-leaderboards channel.</p>
+    <div class="form-grid" style="margin-bottom:18px">
+      <div class="fg">
+        <label>Post Channel</label>
+        <div style="display:flex;gap:8px">
+          <select id="lb-channel2" style="flex:1"><option value="">— select channel —</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadLbChannels()">↻</button>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Game Mode</label>
+        <select id="lb-mode2"><option value="">All Modes</option></select>
+      </div>
+    </div>
+    <button class="btn btn-sm" style="background:linear-gradient(135deg,#7A5800,#C8900A,#FFB800);color:#000;font-weight:900;padding:11px 26px;font-size:.9rem;box-shadow:0 4px 18px rgba(255,184,0,.35)" onclick="postLeaderboard()">🏆 Post Leaderboard</button>
+  </div>
 </div>
 
 <!-- ══════════════ CONFIG ══════════════ -->
 <div class="page" id="page-config">
+  <div class="card" style="border-color:rgba(139,92,246,.25)">
+    <div class="settings-section">
+      <h3>Scrim Host Access</h3>
+      <p style="font-size:.8rem;color:var(--muted);line-height:1.6;margin-bottom:14px">
+        Set a password for <strong style="color:#a78bfa">@Scrim Host</strong> users. They can log in with any username + this password and will only see the scrim controls on the Dashboard — no Settings, Schedule, Verify, Config, Invite, or Announcement access.
+      </p>
+      <div class="form-grid cols1">
+        <div class="fg">
+          <label>Scrim Host Password</label>
+          <div class="token-wrap">
+            <input type="password" id="c-host-password" placeholder="Leave blank to disable host access">
+            <button class="eye-btn" onclick="toggleHostEye()">👁</button>
+          </div>
+          <div class="hint">Share this password with your scrim hosts. Leave blank to revoke access for all hosts.</div>
+        </div>
+      </div>
+    </div>
+    <div class="save-bar">
+      <button class="btn btn-sm" onclick="saveHostPassword()" style="background:linear-gradient(135deg,#4C1D95,#7C3AED,#a78bfa);color:#fff;font-weight:900;padding:9px 20px;box-shadow:0 4px 16px rgba(139,92,246,.4)">Save Host Password</button>
+      <span id="save-note-host" style="font-size:.78rem;color:#a78bfa;display:none">Saved!</span>
+    </div>
+  </div>
   <div class="card">
     <div class="settings-section">
       <h3>Bot Configuration</h3>
@@ -952,23 +1195,55 @@ code{
       <span id="save-note2">Restart the bot for changes to take effect.</span>
     </div>
   </div>
+  <div class="card">
+    <div class="settings-section">
+      <h3>Epic OAuth</h3>
+      <div class="form-grid cols1">
+        <div class="fg">
+          <label>Epic Client ID</label>
+          <input type="text" id="c-epic-id" placeholder="From dev.epicgames.com/portal">
+          <div class="hint">Create an app at <strong style="color:var(--text)">dev.epicgames.com/portal</strong> → Your Product → Epic Account Services → Clients. Copy the Client ID.</div>
+        </div>
+        <div class="fg">
+          <label>Epic Client Secret</label>
+          <div class="token-wrap">
+            <input type="password" id="c-epic-secret" placeholder="Client secret from Epic developer portal">
+            <button class="eye-btn" onclick="toggleEpicEye()">👁</button>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Base URL (redirect URI)</label>
+          <input type="text" id="c-base-url" placeholder="http://localhost:3000">
+          <div class="hint">The public URL of this dashboard. In the Epic portal, add <code>[Base URL]/verify/epic/callback</code> as an allowed redirect URI.</div>
+        </div>
+      </div>
+    </div>
+    <div class="save-bar">
+      <button class="btn btn-primary" onclick="saveEpicConfig()">Save Epic Config</button>
+      <span id="save-note3" style="font-size:.78rem;color:var(--muted);display:none">Saved!</span>
+    </div>
+  </div>
 </div>
 
 <div id="toasts"></div>
 
 <!-- Dispatch Modal -->
-<div id="dispatch-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(14px);z-index:500;align-items:center;justify-content:center">
-  <div style="background:linear-gradient(145deg,rgba(3,16,38,.98),rgba(1,8,20,.99));border:1px solid rgba(0,212,255,.22);border-radius:18px;padding:34px;width:440px;max-width:92vw;box-shadow:0 28px 80px rgba(0,0,0,.9);position:relative;overflow:hidden">
-    <div style="position:absolute;top:0;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,rgba(0,212,255,.55),transparent)"></div>
-    <div style="font-size:1.3rem;font-weight:900;background:linear-gradient(135deg,#00D4FF,#7BAAFF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px">🚀 Dispatch Match</div>
-    <p style="color:var(--muted);font-size:.84rem;margin-bottom:22px;line-height:1.65">Enter the match code. The sign-up embed will be <strong style="color:var(--red)">deleted</strong> and an animated dispatch will play in Discord.</p>
+<div id="dispatch-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);backdrop-filter:blur(16px);z-index:500;align-items:center;justify-content:center">
+  <div style="background:linear-gradient(145deg,rgba(22,4,4,.98),rgba(4,4,22,.99));border:1px solid rgba(255,70,0,.3);border-radius:18px;padding:34px;width:460px;max-width:92vw;box-shadow:0 28px 90px rgba(0,0,0,.95),0 0 60px rgba(255,40,0,.1) inset;position:relative;overflow:hidden">
+    <div style="position:absolute;top:0;left:8%;right:8%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,80,0,.65),rgba(255,40,200,.4),transparent)"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span class="siren" style="font-size:1.7rem">🚨</span>
+      <div style="font-size:1.3rem;font-weight:900;background:linear-gradient(135deg,#FF4500,#FF8C00,#FFD700);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.04em">DISPATCH MATCH</div>
+      <span class="siren" style="font-size:1.7rem">🚨</span>
+    </div>
+    <p style="color:rgba(210,180,140,.65);font-size:.84rem;margin-bottom:22px;line-height:1.65">Enter the match code. The sign-up embed will be <strong style="color:#FF4500">deleted</strong> and a siren dispatch will fire in Discord.</p>
     <div class="fg" style="margin-bottom:22px">
-      <label>Match Code</label>
-      <input type="text" id="match-code-input" placeholder="e.g. ocean-5421" style="font-size:1.05rem;letter-spacing:.07em;font-weight:700" autocomplete="off">
+      <label style="color:rgba(255,140,0,.8)">Match Code</label>
+      <input type="text" id="match-code-input" placeholder="e.g. ocean-5421" style="font-size:1.08rem;letter-spacing:.1em;font-weight:700;border-color:rgba(255,80,0,.35);background:rgba(22,4,0,.7);color:#FFD0A0" autocomplete="off">
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="closeDispatchModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitDispatch()">🚀 Dispatch!</button>
+      <button class="btn btn-sm" style="background:linear-gradient(135deg,#7A0000,#C42000,#FF4500);color:#fff;font-weight:900;padding:11px 22px;box-shadow:0 4px 22px rgba(255,50,0,.45);border:1px solid rgba(255,80,0,.35);letter-spacing:.05em;display:flex;align-items:center;gap:6px" onclick="submitDispatch()"><span class="siren" style="font-size:.95rem">🚨</span>DISPATCH!</button>
     </div>
   </div>
 </div>
@@ -981,6 +1256,7 @@ let statusInterval = null;
 
 // ── Init ──────────────────────────────────────────────────────────────
 async function init() {
+  await loadUserRole();
   const meta = await api('/api/meta');
   SCRIMS = meta.scrims;
   buildScrimGrid();
@@ -1005,9 +1281,11 @@ function showPage(name, btn) {
     c.style.animation = 'none'; void c.offsetWidth;
     c.style.animation = `card-in .28s ease ${i * 0.055}s both`;
   });
-  if (name === 'settings') loadSettings();
+  if (name === 'settings') { loadSettings(); loadAccount(); }
   if (name === 'config') loadConfig();
   if (name === 'schedule') { loadScheduleChannels(); loadScheduleSettings(); }
+  if (name === 'verify') { loadVerifyChannels(); loadVerifySettings(); }
+  if (name === 'leaderboard') loadLbChannels();
 }
 
 // ── API ───────────────────────────────────────────────────────────────
@@ -1024,6 +1302,8 @@ function buildScrimGrid() {
   // Populate announcement scrim picker
   const annSel=document.getElementById('ann-scrim-type');
   if(annSel) annSel.innerHTML=Object.entries(SCRIMS).map(([k,v])=>`<option value="${k}">${v.emoji} ${v.name}</option>`).join('');
+  const lbOpts='<option value="">All Modes</option>'+Object.entries(SCRIMS).map(([k,v])=>`<option value="${k}">${v.emoji} ${v.name}</option>`).join('');
+  ['lb-mode','lb-mode2'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=lbOpts;});
 
   grid.innerHTML = Object.entries(SCRIMS).map(([key, s], i) => {
     const party = s.party === 1 ? 'Solo' : s.party === 2 ? 'Duos' : s.party === 3 ? 'Trios' : 'Squads';
@@ -1069,15 +1349,19 @@ function renderStatusBar(s) {
   const txt = document.getElementById('status-text');
   const btn = document.getElementById('toggle-btn');
   const user = document.getElementById('bot-user');
+  const pill = document.getElementById('status-pill');
   if (s.running && s.user) {
     dot.className = 'dot online'; txt.textContent = 'ONLINE';
     user.textContent = s.user; btn.textContent = 'Stop Bot'; btn.className = 'btn btn-danger btn-sm';
+    pill.classList.add('is-online');
   } else if (s.running) {
     dot.className = 'dot connecting'; txt.textContent = 'CONNECTING';
     user.textContent = ''; btn.textContent = 'Stop Bot'; btn.className = 'btn btn-danger btn-sm';
+    pill.classList.remove('is-online');
   } else {
     dot.className = 'dot'; txt.textContent = 'OFFLINE';
     user.textContent = ''; btn.textContent = 'Start Bot'; btn.className = 'btn btn-primary btn-sm';
+    pill.classList.remove('is-online');
     if (s.error) toast('Bot error: ' + s.error, true);
   }
 }
@@ -1097,8 +1381,8 @@ function renderActiveScrim(s) {
     card.style.setProperty('--live-c', sc.hex + '30');
     card.classList.add('is-live');
 
-    const badgeColor = s.dispatched ? '#FFA500' : sc.hex;
-    const badgeLabel = s.dispatched ? 'DISPATCHED' : 'LIVE — SIGN UPS OPEN';
+    const badgeColor = s.dispatched ? '#FF5500' : sc.hex;
+    const badgeLabel = s.dispatched ? '<span class="siren">🚨</span> DISPATCHED' : 'LIVE — SIGN UPS OPEN';
     const signupLine = s.dispatched
       ? `🙋 ${s.missed_count||0} missed`
       : `✋ ${s.signup_count||0} signed up`;
@@ -1106,7 +1390,7 @@ function renderActiveScrim(s) {
     const dispatchBtn = !s.dispatched
       ? `<button class="btn btn-sm" style="background:linear-gradient(135deg,#003F6E,#0077B6,#00A8E8);color:#fff;font-weight:800;padding:10px 18px;box-shadow:0 4px 18px rgba(0,168,232,.35)" onclick="openDispatchModal()">🚀 Dispatch</button>`
       : `<div style="display:flex;gap:7px;align-items:center">
-           <div style="background:rgba(255,165,0,.12);color:#FFA500;border:1px solid rgba(255,165,0,.28);border-radius:8px;padding:10px 16px;font-size:.82rem;font-weight:800">🚀 Dispatched</div>
+           <div style="background:rgba(255,50,0,.12);color:#FF5500;border:1px solid rgba(255,60,0,.38);border-radius:8px;padding:10px 16px;font-size:.82rem;font-weight:800;display:flex;align-items:center;gap:5px"><span class="siren" style="font-size:.95rem">🚨</span>DISPATCHED<span class="siren" style="font-size:.95rem">🚨</span></div>
            <button class="btn btn-sm" style="background:rgba(255,51,102,.12);color:var(--red);border:1px solid rgba(255,51,102,.28);font-weight:800" onclick="endDispatch()">✕ End</button>
          </div>`;
 
@@ -1171,6 +1455,11 @@ function updateTimer() {
 }
 
 // ── Bot ───────────────────────────────────────────────────────────────
+async function inviteBot() {
+  const res = await api('/api/bot/invite-url');
+  if (res.error) return toast(res.error, true);
+  window.open(res.url, '_blank');
+}
 async function toggleBot() {
   if (cachedStatus?.running) {
     await api('/api/bot/stop', 'POST'); toast('Bot stopped.');
@@ -1263,6 +1552,7 @@ async function postStarted() {
   const res = await api('/api/scrim/started', 'POST', { count, next_game_time: nextGameTime });
   if (res.error) return toast(res.error, true);
   toast(`Started!${count>0?' '+count+' players':''}`);
+  document.getElementById('active-card').style.display = 'none';
 }
 async function postAnnouncement() {
   const res = await api('/api/schedule/post', 'POST', { scrim_key: cachedStatus?.active_scrim||null });
@@ -1311,6 +1601,14 @@ async function loadSettings() {
   document.getElementById('s-line2').value=s.concluded_line2||'';
   document.getElementById('s-line3').value=s.concluded_line3||'';
   document.getElementById('s-invite').value=s.invite_link||'';
+  document.getElementById('s-dp-prefix').value=s.dispatch_title_prefix??'🚨';
+  document.getElementById('s-dp-suffix').value=s.dispatch_title_suffix??'🚨';
+  document.getElementById('s-dp-intro').value=s.dispatch_intro||'';
+  document.getElementById('s-dp-missed').value=s.dispatch_missed||'';
+  document.getElementById('s-dp-signed').value=s.dispatch_signed||'';
+  priorityRoles = Array.isArray(s.scrim_priority_roles) ? s.scrim_priority_roles.map(t=>Array.isArray(t)?[...t]:[]) : [];
+  renderPriorityTiers();
+  if (!guildRoles.length) api('/api/roles').then(d=>{ guildRoles=d.roles||[]; renderPriorityTiers(); });
 }
 async function saveSettings() {
   const commands={concluded:document.getElementById('s-cmd-concluded').value,started:document.getElementById('s-cmd-started').value};
@@ -1330,16 +1628,43 @@ async function saveSettings() {
     concluded_line2:document.getElementById('s-line2').value,
     concluded_line3:document.getElementById('s-line3').value,
     invite_link:document.getElementById('s-invite').value,
+    scrim_priority_roles:priorityRoles,
+    dispatch_title_prefix:document.getElementById('s-dp-prefix').value,
+    dispatch_title_suffix:document.getElementById('s-dp-suffix').value,
+    dispatch_intro:document.getElementById('s-dp-intro').value,
+    dispatch_missed:document.getElementById('s-dp-missed').value,
+    dispatch_signed:document.getElementById('s-dp-signed').value,
   });
   if(res.error) return toast(res.error,true);
   toast('Settings saved!');
   const n=document.getElementById('save-note');
   n.style.display='inline'; setTimeout(()=>n.style.display='none',4000);
 }
+async function loadAccount() {
+  const me = await api('/api/me');
+  const el = document.getElementById('acc-username');
+  if (el) el.value = me.username || '';
+}
+async function saveAccount() {
+  const u = document.getElementById('acc-username').value.trim();
+  const p = document.getElementById('acc-password').value;
+  const p2 = document.getElementById('acc-confirm').value;
+  if (!u) { toast('Username is required', true); return; }
+  const res = await api('/api/account/update', 'POST', {username:u, password:p, confirm_password:p2});
+  if (res.error) { toast(res.error, true); return; }
+  document.getElementById('acc-password').value = '';
+  document.getElementById('acc-confirm').value = '';
+  toast('Account updated!');
+  const n = document.getElementById('acc-note');
+  n.style.display = 'inline'; setTimeout(() => n.style.display='none', 3000);
+}
 async function loadConfig() {
   const s=await api('/api/settings');
   document.getElementById('c-token').value=s.token||'';
   document.getElementById('c-guild').value=s.guild_id||'';
+  document.getElementById('c-epic-id').value=s.epic_client_id||'';
+  document.getElementById('c-epic-secret').value=s.epic_client_secret||'';
+  document.getElementById('c-base-url').value=s.base_url||'';
 }
 async function saveConfig() {
   const res=await api('/api/settings','POST',{token:document.getElementById('c-token').value,guild_id:document.getElementById('c-guild').value});
@@ -1348,7 +1673,19 @@ async function saveConfig() {
   const n=document.getElementById('save-note2');
   n.style.display='inline'; setTimeout(()=>n.style.display='none',4000);
 }
+async function saveEpicConfig() {
+  const res=await api('/api/settings','POST',{
+    epic_client_id:document.getElementById('c-epic-id').value,
+    epic_client_secret:document.getElementById('c-epic-secret').value,
+    base_url:document.getElementById('c-base-url').value,
+  });
+  if(res.error) return toast(res.error,true);
+  toast('Epic config saved!');
+  const n=document.getElementById('save-note3');
+  n.style.display='inline'; setTimeout(()=>n.style.display='none',3000);
+}
 function toggleEye(){const i=document.getElementById('c-token');i.type=i.type==='password'?'text':'password';}
+function toggleEpicEye(){const i=document.getElementById('c-epic-secret');i.type=i.type==='password'?'text':'password';}
 
 // ── Toast ─────────────────────────────────────────────────────────────
 function toast(msg,isErr=false){
@@ -1376,6 +1713,8 @@ async function loadAlertChannels(channels){
   if(ann){const annCur=ann.value;ann.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===annCur?'selected':''}>#${esc(c.name)}</option>`).join('');}
   const inv=document.getElementById('invite-channel');
   if(inv){const invCur=inv.value;inv.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===invCur?'selected':''}>#${esc(c.name)}</option>`).join('');}
+  const lb=document.getElementById('lb-channel');
+  if(lb){const lbCur=lb.value;lb.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===lbCur?'selected':''}>#${esc(c.name)}</option>`).join('');}
 }
 async function loadAnnChannels(){
   const {channels=[]}=await api('/api/channels');
@@ -1386,6 +1725,22 @@ async function loadInviteChannels(){
   const {channels=[]}=await api('/api/channels');
   const sel=document.getElementById('invite-channel');
   if(sel){const cur=sel.value;sel.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===cur?'selected':''}>#${esc(c.name)}</option>`).join('');}
+}
+async function loadLbChannels(){
+  const {channels=[]}=await api('/api/channels');
+  const opts='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}">#${esc(c.name)}</option>`).join('');
+  ['lb-channel','lb-channel2'].forEach(id=>{const sel=document.getElementById(id);if(sel)sel.innerHTML=opts;});
+}
+async function postLeaderboard(){
+  const onLbPage=!!document.getElementById('page-leaderboard')?.classList.contains('active');
+  const chSel=document.getElementById(onLbPage?'lb-channel2':'lb-channel');
+  const modeSel=document.getElementById(onLbPage?'lb-mode2':'lb-mode');
+  const channel_id=chSel?.value||'';
+  const scrim_key=modeSel?.value||null;
+  if(!channel_id) return toast('Pick a channel first.',true);
+  const res=await api('/api/leaderboard/post','POST',{channel_id,scrim_key});
+  if(res.error) return toast(res.error,true);
+  toast('Leaderboard posted!');
 }
 async function postInvite(){
   const channel_id=document.getElementById('invite-channel').value;
@@ -1448,6 +1803,151 @@ async function saveScheduleSettings(){
   updateScheduleCountdown();
 }
 
+// ── Verify ────────────────────────────────────────────────────────────
+async function loadVerifyChannels(){
+  const {channels=[]}=await api('/api/channels');
+  const s=await api('/api/settings');
+  const sel=document.getElementById('verify-channel');
+  if(sel) sel.innerHTML='<option value="">— select channel —</option>'+channels.map(c=>`<option value="${c.id}" ${c.id===s.verify_channel_id?'selected':''}>#${esc(c.name)}</option>`).join('');
+}
+async function loadVerifySettings(){
+  await loadVerifiedUsers();
+}
+async function loadVerifiedUsers(){
+  const {verified_users=[]}=await api('/api/verify/users');
+  const listEl=document.getElementById('verified-list');
+  const badge=document.getElementById('verified-count-badge');
+  if(badge) badge.textContent=verified_users.length;
+  if(!listEl) return;
+  if(!verified_users.length){
+    listEl.innerHTML='<span style="color:var(--muted);font-size:.84rem">No verified members yet.</span>';
+    return;
+  }
+  listEl.innerHTML=verified_users.map((v,i)=>{
+    const date=new Date(v.timestamp+'Z');
+    const when=date.toLocaleDateString()+' '+date.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    const epicTag=v.epic_name?`<span style="font-size:.72rem;color:#00D4FF;font-weight:700">🎮 ${esc(v.epic_name)}</span>`:'';
+    return `<div class="player-chip" style="animation-delay:${i*0.05}s;border-color:rgba(0,255,148,.18);gap:10px">
+      <span style="color:var(--green);font-size:1rem">✅</span>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <strong style="font-size:.86rem">${esc(v.username)}</strong>
+        ${epicTag}
+        <span style="font-size:.66rem;color:var(--muted)">${when}</span>
+      </div>
+      <button onclick="removeVerified('${esc(v.user_id)}')" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem;padding:2px 6px;border-radius:4px" title="Remove">✕</button>
+    </div>`;
+  }).join('');
+}
+async function removeVerified(user_id){
+  await api('/api/verify/remove','POST',{user_id});
+  await loadVerifiedUsers();
+}
+async function saveVerifySettings(){
+  const ch=document.getElementById('verify-channel')?.value||'';
+  await api('/api/settings','POST',{verify_channel_id:ch});
+  toast('Verify settings saved!');
+  const n=document.getElementById('save-note-verify');
+  n.style.display='inline'; setTimeout(()=>n.style.display='none',3000);
+}
+async function postVerifyEmbed(){
+  const ch=document.getElementById('verify-channel').value;
+  if(!ch) return toast('Pick a channel first.',true);
+  await api('/api/settings','POST',{verify_channel_id:ch});
+  const res=await api('/api/verify/post','POST');
+  if(res.error) return toast(res.error,true);
+  toast('Verification embed posted!');
+}
+
+// ── Role-based access ────────────────────────────────────────────────
+let USER_ROLE = 'admin';
+
+async function loadUserRole() {
+  const { role = 'admin' } = await api('/api/me');
+  USER_ROLE = role;
+  if (role === 'host') applyHostRestrictions();
+}
+
+function applyHostRestrictions() {
+  // Hide nav tabs except Dashboard
+  document.querySelectorAll('.nav-tab').forEach(btn => {
+    const match = btn.getAttribute('onclick')?.match(/showPage\('(\w+)'/);
+    if (match && match[1] !== 'dashboard') btn.style.display = 'none';
+  });
+  // Hide admin-only cards/elements
+  document.querySelectorAll('[data-admin-only]').forEach(el => el.style.display = 'none');
+}
+
+async function saveHostPassword() {
+  const password = document.getElementById('c-host-password').value;
+  const res = await api('/api/host-password', 'POST', { password });
+  if (res.error) return toast(res.error, true);
+  toast(res.cleared ? 'Host access disabled.' : 'Host password saved!');
+  document.getElementById('c-host-password').value = '';
+  const n = document.getElementById('save-note-host');
+  n.style.display = 'inline'; setTimeout(() => n.style.display = 'none', 3000);
+}
+function toggleHostEye() { const i=document.getElementById('c-host-password'); i.type=i.type==='password'?'text':'password'; }
+
+// ── Priority Roles ───────────────────────────────────────────────────
+let priorityRoles = [];
+let guildRoles = [];
+
+async function reloadGuildRoles() {
+  const { roles = [] } = await api('/api/roles');
+  guildRoles = roles;
+  renderPriorityTiers();
+  if (!roles.length) toast('No roles found — make sure bot is online and guild ID is set.', true);
+  else toast(`Loaded ${roles.length} roles`);
+}
+
+function renderPriorityTiers() {
+  const container = document.getElementById('priority-tiers');
+  if (!container) return;
+  if (!priorityRoles.length) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:.82rem;padding:6px 0">No tiers yet — click + Add Tier below.</div>';
+    return;
+  }
+  const roleOpts = guildRoles.length
+    ? '<option value="">+ Add Role</option>' + guildRoles.map(r => `<option value="${r.id}">@${esc(r.name)}</option>`).join('')
+    : '';
+  container.innerHTML = priorityRoles.map((tier, ti) => {
+    const chips = tier.map((rid, ri) => {
+      const role = guildRoles.find(r => r.id === rid);
+      const name = role ? role.name : rid;
+      return `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);border-radius:16px;padding:3px 10px;font-size:.78rem;font-weight:700;color:#a78bfa">@${esc(name)}<button onclick="removePriorityRole(${ti},${ri})" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:.75rem;padding:0 0 0 3px;line-height:1" title="Remove">✕</button></span>`;
+    }).join('');
+    const picker = guildRoles.length
+      ? `<select onchange="addPriorityRoleById(${ti},this)" style="background:rgba(0,8,20,.9);border:1px solid rgba(0,180,216,.2);border-radius:8px;color:var(--text);padding:5px 8px;font-size:.78rem;min-width:140px;cursor:pointer">${roleOpts}</select>`
+      : `<input type="text" placeholder="Paste Role ID…" onkeydown="if(event.key==='Enter'){addPriorityRoleManual(${ti},this)}" style="width:140px;padding:5px 8px;font-size:.78rem;border-radius:8px;background:rgba(0,8,20,.9);border:1px solid rgba(0,180,216,.2);color:var(--text)" title="Press Enter to add">`;
+    return `<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;background:rgba(0,8,20,.5);border:1px solid rgba(0,180,216,.12);border-radius:10px;padding:10px 14px">
+      <div style="min-width:20px;font-size:.82rem;font-weight:900;color:var(--accent);padding-top:5px">${ti+1}.</div>
+      <div style="flex:1;display:flex;flex-wrap:wrap;gap:6px;align-items:center">${chips}${picker}</div>
+      <button onclick="removePriorityTier(${ti})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem;padding:4px 6px;border-radius:4px;transition:color .15s" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'" title="Remove tier">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function savePriorityRoles() {
+  const res = await api('/api/settings','POST',{scrim_priority_roles:priorityRoles});
+  if(res.error) return toast(res.error,true);
+  toast('Priority roles saved!');
+  const n=document.getElementById('priority-save-note');
+  if(n){n.style.display='inline';setTimeout(()=>n.style.display='none',3000);}
+}
+function addPriorityTier() { priorityRoles.push([]); renderPriorityTiers(); }
+function removePriorityTier(ti) { priorityRoles.splice(ti,1); renderPriorityTiers(); }
+function addPriorityRoleById(ti, sel) {
+  const id=sel.value; if(!id) return;
+  if(!priorityRoles[ti].includes(id)) priorityRoles[ti].push(id);
+  sel.value=''; renderPriorityTiers();
+}
+function addPriorityRoleManual(ti, inp) {
+  const id=inp.value.trim(); if(!id) return;
+  if(!priorityRoles[ti].includes(id)) priorityRoles[ti].push(id);
+  inp.value=''; renderPriorityTiers();
+}
+function removePriorityRole(ti, ri) { priorityRoles[ti].splice(ri,1); renderPriorityTiers(); }
+
 // ═══ SPLASH ════════════════════════════════════════════════════════════
 (function(){
   const splash = document.createElement('div');
@@ -1468,8 +1968,9 @@ async function saveScheduleSettings(){
   }
   splash.appendChild(wavesEl);
 
-  // Bubbles — negative delays so they're already mid-flight on load
-  for(let i=0;i<24;i++){
+  // Bubbles — fewer on touch devices (iPad) to reduce compositing layers
+  const _bubbleCount = ('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 8 : 24;
+  for(let i=0;i<_bubbleCount;i++){
     const b=document.createElement('div');
     b.className='sp-bubble';
     const size=4+Math.random()*24;
@@ -1576,6 +2077,42 @@ document.addEventListener('click',e=>{
   b.animate([{transform:'scale(1)'},{transform:'scale(.83)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:400,easing:'cubic-bezier(.34,1.56,.64,1)'});
   b.animate([{boxShadow:`0 0 0 0 ${hex}80`},{boxShadow:`0 0 0 22px ${hex}00`}],{duration:550,easing:'ease-out'});
 });
+
+// ═══ STARFIELD ════════════════════════════════════════════════════
+(function(){
+  const canvas = document.getElementById('stars-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let stars = [], W = 0, H = 0;
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  function make() {
+    stars = Array.from({length: 130}, () => ({
+      x: Math.random() * W, y: Math.random() * H * .72,
+      r: Math.random() * 1.1 + .15,
+      phase: Math.random() * Math.PI * 2,
+      speed: .003 + Math.random() * .007,
+      hue: Math.random() < .2 ? 280 : 200,
+    }));
+  }
+  function draw(ts) {
+    ctx.clearRect(0, 0, W, H);
+    const t = ts * .001;
+    for (const s of stars) {
+      const a = (Math.sin(t * s.speed * 12 + s.phase) * .42 + .52) * .55;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${s.hue},80%,90%,${a})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', () => { resize(); make(); });
+  resize(); make();
+  requestAnimationFrame(draw);
+})();
 
 init();
 </script>

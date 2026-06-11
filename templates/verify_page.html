@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Epic Verification — Ocean Scrims</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#01080F;color:#BEE8FF;font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
+.orb1{width:500px;height:500px;background:rgba(0,55,150,.22);top:5%;left:-10%;animation:drift 22s ease-in-out infinite alternate}
+.orb2{width:400px;height:400px;background:rgba(0,170,220,.09);top:20%;right:-12%;animation:drift 28s ease-in-out infinite alternate-reverse}
+@keyframes drift{0%{transform:translate(0,0)}100%{transform:translate(30px,-40px)}}
+
+.card{
+  position:relative;z-index:1;
+  background:rgba(4,16,36,.92);
+  border:1px solid rgba(0,180,216,.22);
+  border-radius:20px;padding:44px 40px;
+  width:100%;max-width:460px;
+  display:flex;flex-direction:column;align-items:center;gap:22px;
+  box-shadow:0 20px 80px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.04);
+  animation:card-in .4s cubic-bezier(.34,1.2,.64,1) both;
+}
+@keyframes card-in{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
+.card::before{content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.55),transparent)}
+
+.wave{font-size:2rem;animation:bob 3s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+.guild-icon{width:60px;height:60px;border-radius:50%;border:2px solid rgba(0,212,255,.3);object-fit:cover}
+.guild-ph{width:60px;height:60px;border-radius:50%;border:2px solid rgba(0,212,255,.3);background:rgba(0,212,255,.1);display:flex;align-items:center;justify-content:center;font-size:1.5rem}
+h1{font-size:1.22rem;font-weight:900;color:#fff;text-align:center}
+.sub{font-size:.84rem;color:#2E6880;text-align:center;line-height:1.6}
+.hl{color:#BEE8FF;font-weight:700}
+
+.panel{display:none;flex-direction:column;align-items:center;gap:18px;width:100%;text-align:center}
+.panel.show{display:flex;animation:fade-up .3s ease both}
+@keyframes fade-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* Epic sign-in button */
+.btn-epic{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  background:linear-gradient(135deg,#0064CC,#0094FF,#00B4FF);
+  color:#fff;border:none;border-radius:12px;
+  padding:16px 32px;font-size:1.05rem;font-weight:800;cursor:pointer;width:100%;
+  box-shadow:0 6px 28px rgba(0,100,200,.5);
+  transition:filter .15s,transform .15s,box-shadow .15s;
+  letter-spacing:.02em;
+}
+.btn-epic:hover{filter:brightness(1.15);transform:translateY(-2px);box-shadow:0 10px 36px rgba(0,120,220,.7)}
+.btn-epic:active{transform:translateY(0)}
+
+/* Waiting state */
+.waiting-box{
+  width:100%;background:rgba(0,212,255,.05);
+  border:1px solid rgba(0,212,255,.18);border-radius:12px;
+  padding:18px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;
+}
+.dots{display:flex;gap:7px;align-items:center;justify-content:center}
+.dot{width:9px;height:9px;border-radius:50%;background:#00D4FF;animation:dp 1.4s ease-in-out infinite}
+.dot:nth-child(2){animation-delay:.2s}
+.dot:nth-child(3){animation-delay:.4s}
+@keyframes dp{0%,80%,100%{opacity:.2;transform:scale(.7)}40%{opacity:1;transform:scale(1.3)}}
+.wait-text{font-size:.85rem;color:#2E6880;font-weight:600}
+
+/* Ring */
+.ring-wrap{position:relative;width:96px;height:96px}
+svg.ring{transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:rgba(0,180,216,.12);stroke-width:6}
+.ring-fill{fill:none;stroke:url(#rg);stroke-width:6;stroke-linecap:round;
+  stroke-dasharray:264;stroke-dashoffset:264;transition:stroke-dashoffset .22s linear}
+.ring-num{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-size:1.9rem;font-weight:900;
+  background:linear-gradient(135deg,#00D4FF,#00F5D4);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+.csteps{width:100%;display:flex;flex-direction:column;gap:8px}
+.cstep{display:flex;align-items:center;gap:10px;padding:9px 14px;
+  border-radius:10px;background:rgba(0,8,20,.5);border:1px solid rgba(0,180,216,.1);
+  font-size:.82rem;font-weight:600;opacity:.3;transition:opacity .3s,border-color .3s}
+.cstep.done{opacity:1;border-color:rgba(0,255,148,.25)}
+.cstep.active{opacity:1;border-color:rgba(0,212,255,.35);animation:sp 1.2s ease-in-out infinite}
+@keyframes sp{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 4px rgba(0,212,255,.1)}}
+.ci{width:20px;text-align:center;flex-shrink:0}
+
+.tick{font-size:3.6rem;filter:drop-shadow(0 0 22px rgba(0,255,148,.7));animation:tp .5s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes tp{from{transform:scale(0) rotate(-30deg);opacity:0}to{transform:none;opacity:1}}
+.footer{font-size:.68rem;color:rgba(46,104,128,.45);text-align:center}
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="card">
+  <div class="wave">🌊</div>
+  {% if guild_icon %}
+  <img class="guild-icon" src="{{ guild_icon }}" alt="">
+  {% else %}
+  <div class="guild-ph">🎮</div>
+  {% endif %}
+
+  <!-- Step 1: Launch Epic login -->
+  <div class="panel show" id="p-start">
+    <h1>Link Your Epic Account</h1>
+    <p class="sub">Click below to open the Epic Games login.<br>
+      Sign in, then <strong style="color:#BEE8FF">close the Epic window</strong> to complete verification.</p>
+    <button class="btn-epic" id="epic-btn" onclick="launchEpic()">
+      <span style="font-size:1.4rem">🎮</span> Sign in with Epic Games
+    </button>
+    <div class="footer">🌊 Ocean Scrims  •  <span class="hl" style="font-size:.75rem">{{ guild_name }}</span></div>
+  </div>
+
+  <!-- Step 2: Waiting for popup to close -->
+  <div class="panel" id="p-wait">
+    <h1>Sign In with Epic</h1>
+    <div class="waiting-box">
+      <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <div class="wait-text">Waiting for Epic login — sign in then close the Epic window</div>
+    </div>
+    <p class="sub">Once you've signed in on Epic, close that tab/window and your verification will start automatically.</p>
+    <button onclick="launchEpic()" style="background:none;border:1px solid rgba(0,180,216,.2);border-radius:8px;padding:8px 18px;color:#2E6880;font-size:.8rem;cursor:pointer;transition:all .2s" onmouseover="this.style.color='#BEE8FF'" onmouseout="this.style.color='#2E6880'">
+      Re-open Epic login
+    </button>
+    <div class="footer">🌊 Ocean Scrims  •  Epic Account Verification</div>
+  </div>
+
+  <!-- Step 3: Countdown -->
+  <div class="panel" id="p-count">
+    <h1>Verifying Account</h1>
+    <p class="sub"><span class="hl">{{ username }}</span> → <span class="hl">{{ guild_name }}</span></p>
+    <div class="ring-wrap">
+      <svg class="ring" width="96" height="96" viewBox="0 0 96 96">
+        <defs>
+          <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#00D4FF"/>
+            <stop offset="100%" stop-color="#00F5D4"/>
+          </linearGradient>
+        </defs>
+        <circle class="ring-bg" cx="48" cy="48" r="42"/>
+        <circle class="ring-fill" id="ring-fill" cx="48" cy="48" r="42"/>
+      </svg>
+      <div class="ring-num" id="ring-num">5</div>
+    </div>
+    <div class="csteps">
+      <div class="cstep active" id="cs0"><span class="ci" id="ci0">🔗</span> Connecting to Epic Games servers...</div>
+      <div class="cstep"        id="cs1"><span class="ci" id="ci1">🔍</span> Confirming Epic account credentials...</div>
+      <div class="cstep"        id="cs2"><span class="ci" id="ci2">🛡️</span> Verifying server membership...</div>
+      <div class="cstep"        id="cs3"><span class="ci" id="ci3">✅</span> Granting scrim access...</div>
+    </div>
+    <div class="footer">🌊 Ocean Scrims  •  Epic Account Verification</div>
+  </div>
+
+  <!-- Step 4: Done -->
+  <div class="panel" id="p-ok">
+    <div class="tick">✅</div>
+    <h1>Account Verified!</h1>
+    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.22);border-radius:20px;padding:6px 16px;font-size:.84rem;font-weight:700;color:#00D4FF">
+      🎮 {{ guild_name }}
+    </div>
+    <p class="sub">
+      Linked to <strong style="color:#BEE8FF">{{ guild_name }}</strong>.<br>
+      You now have full access to scrim lobbies.<br>
+      <span style="display:block;margin-top:6px;font-size:.78rem">Check your DMs — the bot sent a confirmation.</span>
+    </p>
+    <div class="footer">🌊 Ocean Scrims  •  You can close this tab</div>
+  </div>
+</div>
+
+<script>
+const TOTAL = 5, CIRC = 2 * Math.PI * 42;
+const ring  = document.getElementById('ring-fill');
+const numEl = document.getElementById('ring-num');
+ring.style.strokeDasharray  = CIRC;
+ring.style.strokeDashoffset = CIRC;
+
+let epicPopup = null;
+let pollTimer = null;
+
+function show(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+}
+
+function launchEpic() {
+
+  // Open the real Epic login in a popup window
+  epicPopup = window.open(
+    'https://www.epicgames.com/id/login',
+    'epic_login',
+    'width=500,height=650,left=' + ((screen.width-500)/2) + ',top=' + ((screen.height-650)/2)
+  );
+
+  show('p-wait');
+
+  // Poll every 500ms — when the popup closes, start the countdown
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => {
+    try {
+      if (epicPopup && epicPopup.closed) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        startCountdown();
+      }
+    } catch(e) {}
+  }, 500);
+}
+
+function startCountdown() {
+  show('p-count');
+  const stepAt = [0, 1.2, 2.6, 3.9];
+  let start = null;
+
+  function setStep(idx) {
+    for (let i = 0; i < 4; i++) {
+      const s  = document.getElementById('cs' + i);
+      const ic = document.getElementById('ci' + i);
+      s.classList.remove('active', 'done');
+      if (i < idx)      { s.classList.add('done');   ic.textContent = '✅'; }
+      else if (i===idx) { s.classList.add('active'); }
+    }
+  }
+
+  function tick(ts) {
+    if (!start) start = ts;
+    const elapsed   = (ts - start) / 1000;
+    const progress  = Math.min(elapsed / TOTAL, 1);
+    const remaining = Math.max(0, Math.ceil(TOTAL - elapsed));
+    ring.style.strokeDashoffset = CIRC * (1 - progress);
+    numEl.textContent = progress >= 1 ? '✓' : remaining;
+    let si = 0;
+    for (let i = 0; i < stepAt.length; i++) { if (elapsed >= stepAt[i]) si = i; }
+    setStep(si);
+    if (progress < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      for (let i = 0; i < 4; i++) {
+        document.getElementById('cs'+i).classList.add('done');
+        document.getElementById('cs'+i).classList.remove('active');
+        document.getElementById('ci'+i).textContent = '✅';
+      }
+      finalize();
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+async function finalize() {
+  try {
+    await fetch('/verify/epic/finalize/{{ fin_token }}', { method: 'POST' });
+  } catch(e) {}
+  show('p-ok');
+}
+</script>
+</body>
+</html>

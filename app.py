@@ -1,10 +1,24 @@
 from flask import Flask, render_template, request, jsonify, session, redirect
+from werkzeug.security import generate_password_hash, check_password_hash
 import discord
 from discord.ext import commands
-import json, os, threading, asyncio, logging, secrets
+import json, os, sys, threading, asyncio, logging, secrets, ssl, urllib.request, urllib.parse, base64
+import certifi
+import aiohttp
 from datetime import datetime, timedelta
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
+
+# In-memory pending tokens
+PENDING_VERIFICATIONS = {}
+# user_id → guild_id, waiting for a DM reply with their Fortnite name
+PENDING_NICKNAME = {}
+# channel_id → {guild_id, s}, waiting for dispatch code reply
+PENDING_DISPATCH = {}
+
+EPIC_AUTH_URL    = "https://www.epicgames.com/id/authorize"
+EPIC_TOKEN_URL   = "https://api.epicgames.dev/epic/oauth/v2/token"
+EPIC_USERINFO_URL = "https://api.epicgames.dev/epic/oauth/v2/userInfo"
 
 # Railway / cloud sets PORT and DISCORD_TOKEN as environment variables
 PORT = int(os.environ.get("PORT", 3000))
@@ -12,8 +26,9 @@ ENV_TOKEN = os.environ.get("DISCORD_TOKEN", "")
 
 flask_app = Flask(__name__)
 flask_app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+flask_app.config["TEMPLATES_AUTO_RELOAD"] = True
 
-LOGIN_USERNAME = os.environ.get("LOGIN_USERNAME", "cabz2x")
+LOGIN_USERNAME = os.environ.get("LOGIN_USERNAME", "")
 LOGIN_PASSWORD = os.environ.get("LOGIN_PASSWORD", "")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,6 +58,8 @@ DEFAULT = {
     "host_name": "Ocean Scrims",
     "platforms": "PC / Windows, PlayStation, Xbox, Mobile",
     "verification_required": True,
+    # Scrim priority role tiers  [[role_id, ...], ...]
+    "scrim_priority_roles": [],
     # Schedule
     "schedule_enabled": False,
     "schedule_channel_id": "",
@@ -75,6 +92,19 @@ DEFAULT = {
     "concluded_line1": "Games will resume **AFTER DOWNTIME ENDS!**",
     "concluded_line2": "**SEE YOU THEN :)**",
     "concluded_line3": "Make sure to invite your friends,",
+    # Dispatch customization
+    "dispatch_title_prefix": "🚨",
+    "dispatch_title_suffix": "🚨",
+    "dispatch_intro": "**The lobby is live — get in!**",
+    "dispatch_missed": "🟥  **Missed queue?** — React ✋ below to sign up late",
+    "dispatch_signed": "⭕  **Already signed up?** — Ignore this message",
+    # Verify / Epic OAuth
+    "verify_channel_id": "",
+    "base_url": f"http://localhost:{PORT}",
+    "epic_client_id": "",
+    "epic_client_secret": "",
+    "verified_users": [],
+    "active_scrim_label": "",
     "game_number": 0,
     "max_games": 0,
     "last_next_game_msg_id": None,
@@ -111,24 +141,113 @@ def save_settings(s):
         json.dump(s, f, indent=2)
 
 
+GUILDS_DIR = os.path.join(DATA_DIR, "guilds")
+
+def _home_guild_id():
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE) as f:
+                return str(json.load(f).get("guild_id", ""))
+    except Exception:
+        pass
+    return ""
+
+def load_guild_settings(guild_id):
+    """Load settings for a guild. Home guild uses main settings.json."""
+    gid = str(guild_id)
+    if gid == _home_guild_id() or not gid:
+        return load_settings()
+    path = os.path.join(GUILDS_DIR, f"{gid}.json")
+    if os.path.exists(path):
+        with open(path) as f:
+            saved = json.load(f)
+        result = dict(DEFAULT)
+        for k, v in saved.items():
+            if isinstance(v, dict) and k in result and isinstance(result[k], dict):
+                result[k] = {**result[k], **v}
+            else:
+                result[k] = v
+        return result
+    return dict(DEFAULT)
+
+def save_guild_settings(guild_id, s):
+    """Save settings for a guild. Home guild uses main settings.json."""
+    gid = str(guild_id)
+    if gid == _home_guild_id() or not gid:
+        save_settings(s)
+        return
+    os.makedirs(GUILDS_DIR, exist_ok=True)
+    with open(os.path.join(GUILDS_DIR, f"{gid}.json"), "w") as f:
+        json.dump(s, f, indent=2)
+
+
+def _get_credentials():
+    """Return (username, password_hash) from env vars or settings file."""
+    if LOGIN_USERNAME and LOGIN_PASSWORD:
+        return LOGIN_USERNAME, None, LOGIN_PASSWORD  # (user, hash, plain)
+    s = load_settings()
+    return s.get("account_username", ""), s.get("account_password_hash", ""), None
+
+
+def _account_exists():
+    if LOGIN_USERNAME and LOGIN_PASSWORD:
+        return True
+    s = load_settings()
+    return bool(s.get("account_password_hash"))
+
+
+def _check_login(username, password):
+    """Return 'admin', 'host', or None."""
+    # Check admin credentials
+    if LOGIN_USERNAME and LOGIN_PASSWORD:
+        if username == LOGIN_USERNAME and password == LOGIN_PASSWORD:
+            return "admin"
+    else:
+        s = load_settings()
+        stored_user = s.get("account_username", "")
+        stored_hash = s.get("account_password_hash", "")
+        if stored_hash and username == stored_user and check_password_hash(stored_hash, password):
+            return "admin"
+    # Check scrim host password (any username)
+    s = load_settings()
+    host_hash = s.get("scrim_host_password_hash", "")
+    if host_hash and check_password_hash(host_hash, password):
+        return "host"
+    return None
+
+
 def build_signup_embed(scrim_key, settings, guild=None):
     scrim = SCRIMS[scrim_key]
-    embed = discord.Embed(title="Tournament Matchmaking", color=scrim["color"])
+    label = settings.get("active_scrim_label", "")
+    label_str = f" — {label.title()}" if label else ""
+    embed = discord.Embed(title=f"Tournament Matchmaking{label_str}", color=scrim["color"])
     embed.description = (
         "A new custom match has been opened!\n"
-        "**Please click ✋ to sign up for the scrim.**\n\n"
+        "**Please click ✋ to sign up for the match.**\n\n"
         "Make sure to have the correct amount of players in your party."
     )
-    embed.add_field(name="Game Mode", value=f"{scrim['emoji']} {scrim['name']} Scrims", inline=True)
-    embed.add_field(name="Players in your party", value=str(scrim["party"]), inline=True)
+
+    priority_tiers = settings.get("scrim_priority_roles", [])
+    if priority_tiers:
+        lines = []
+        for i, tier in enumerate(priority_tiers, 1):
+            role_ids = [r for r in tier if r]
+            if role_ids:
+                lines.append(f"{i}. " + ", ".join(f"<@&{rid}>" for rid in role_ids))
+        if lines:
+            embed.add_field(name="Scrim Priority", value="\n".join(lines), inline=False)
+
+    mode_val = f"{scrim['emoji']} {scrim['name']}{label_str} Scrims"
+    embed.add_field(name="Game Mode", value=mode_val, inline=False)
+    embed.add_field(name="Players in your party", value=str(scrim["party"]), inline=False)
     if settings.get("verification_required", True):
         embed.add_field(name="⚠️  Verification required  ⚠️",
                         value="All members of your team must be verified on this server.", inline=False)
     embed.add_field(name="Allowed Platforms", value=settings.get("platforms", "PC / Windows, PlayStation, Xbox, Mobile"), inline=False)
-    embed.add_field(name="Host", value=settings.get("host_name", "Ocean Scrims"), inline=False)
     if guild and guild.icon:
         embed.set_thumbnail(url=guild.icon.url)
-    embed.set_footer(text="\U0001f30a Ocean Scrims")
+    host = settings.get("host_name", "Ocean Scrims")
+    embed.set_footer(text=f"\U0001f30a Ocean Scrims  •  Host: {host}")
     return embed
 
 
@@ -205,6 +324,172 @@ def _secs_until_next_interval(interval_mins, start_time_str="00:00"):
     return wait if wait >= 10 else wait + interval_mins * 60
 
 
+class _URLView(discord.ui.View):
+    """Generic single URL-button view."""
+    def __init__(self, label, url, emoji=None):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(label=label, url=url, emoji=emoji, style=discord.ButtonStyle.link))
+
+
+class VerifyView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Link Epic Account", emoji="🖐️", style=discord.ButtonStyle.primary, custom_id="verify:link_epic")
+    async def link_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        s = load_settings()
+        client_id = s.get("epic_client_id", "").strip()
+        base_url  = s.get("base_url", f"http://localhost:{PORT}").rstrip("/")
+        guild     = interaction.guild
+        guild_name = guild.name if guild else "Ocean Scrims"
+        guild_icon = guild.icon.url if guild and guild.icon else None
+        user_id    = str(interaction.user.id)
+        username   = interaction.user.display_name
+
+        token = secrets.token_urlsafe(20)
+        PENDING_VERIFICATIONS[token] = {
+            "user_id":    user_id,
+            "username":   username,
+            "guild_name": guild_name,
+            "guild_icon": guild_icon,
+        }
+
+        # DM button → our verify page, which opens Epic login as a popup.
+        # When the popup closes, the countdown starts automatically.
+        verify_url = f"{base_url}/verify/complete/{token}"
+        epic_login = verify_url  # page itself handles opening Epic
+
+        embed = discord.Embed(color=0x00D4FF)
+        embed.set_author(name=f"{guild_name}  •  Epic Verification", icon_url=guild_icon)
+        embed.title = "🔗  Link Your Epic Account"
+        embed.description = (
+            f"Click **Sign in with Epic** to log into your Epic Games account.\n"
+            f"After signing in you'll be automatically brought back and verified for **{guild_name}**.\n\n"
+            f"⚠️  **This link is personal — do not share it.**"
+        )
+        embed.add_field(name="Server",  value=f"**{guild_name}**", inline=True)
+        embed.add_field(name="Member",  value=f"**{username}**",   inline=True)
+        embed.add_field(name="Expires", value="15 minutes",        inline=True)
+        if guild_icon:
+            embed.set_thumbnail(url=guild_icon)
+        embed.set_footer(text="🌊 Ocean Scrims  •  Powered by Epic Games")
+        embed.timestamp = datetime.utcnow()
+
+        try:
+            await interaction.user.send(embed=embed, view=_URLView("Sign in with Epic", epic_login, "🎮"))
+            await interaction.response.send_message(
+                "📬  Check your DMs — sign in with Epic to get verified!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌  I couldn't DM you. Please enable DMs from server members.", ephemeral=True)
+
+
+class LeaderboardView(discord.ui.View):
+    def __init__(self, guild_id: str, scrim_key=None):
+        super().__init__(timeout=None)
+        self.guild_id = str(guild_id)
+        self.scrim_key = scrim_key
+
+        btn_team = discord.ui.Button(label="Check your team", emoji="👤", style=discord.ButtonStyle.secondary)
+        btn_team.callback = self._check_team
+        self.add_item(btn_team)
+
+        btn_lb = discord.ui.Button(label="Check leaderboard", emoji="🏆", style=discord.ButtonStyle.secondary)
+        btn_lb.callback = self._check_leaderboard
+        self.add_item(btn_lb)
+
+    def _get_history(self, guild_id=None):
+        s = load_guild_settings(guild_id or self.guild_id)
+        key = self.scrim_key
+        if key and key in SCRIMS:
+            history = s.get("signup_history_by_mode", {}).get(key, {})
+            if not history:
+                history = s.get("signup_history", {})
+        else:
+            history = s.get("signup_history", {})
+        return s, history
+
+    async def _check_team(self, interaction: discord.Interaction):
+        gid = str(interaction.guild_id) if interaction.guild_id else self.guild_id
+        s, history = self._get_history(gid)
+        uid = str(interaction.user.id)
+        player = history.get(uid)
+        if not player:
+            await interaction.response.send_message("📊 You have no stats recorded yet.", ephemeral=True)
+            return
+
+        sorted_uids = sorted(history, key=lambda u: history[u].get("score", history[u].get("count", 0) * 50), reverse=True)
+        rank = sorted_uids.index(uid) + 1 if uid in sorted_uids else "?"
+        games = player.get("count", 0)
+        wins  = player.get("wins", 0)
+        score = player.get("score", games * 50)
+
+        embed = discord.Embed(title="📊 Your Stats", color=0x00B4D8)
+        embed.add_field(name="Rank",  value=f"#{rank}",  inline=True)
+        embed.add_field(name="Games", value=str(games),  inline=True)
+        embed.add_field(name="Wins",  value=str(wins),   inline=True)
+        embed.add_field(name="Score", value=str(score),  inline=True)
+        embed.set_footer(text="🌊 Ocean Scrims")
+        embed.timestamp = datetime.utcnow()
+
+        try:
+            await interaction.user.send(embed=embed)
+            await interaction.response.send_message("📬 Check your DMs for your stats!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ I couldn't DM you. Please enable DMs from server members.", ephemeral=True)
+
+    async def _check_leaderboard(self, interaction: discord.Interaction):
+        gid = str(interaction.guild_id) if interaction.guild_id else self.guild_id
+        s, history = self._get_history(gid)
+        now = datetime.utcnow()
+        now_str = now.strftime("%m/%d/%Y")
+        key = self.scrim_key
+
+        if key and key in SCRIMS:
+            scrim = SCRIMS[key]
+            title_str = f"Leaderboard {scrim['name']} Scrims - {now_str}"
+            color = scrim["color"]
+        else:
+            title_str = f"Leaderboard All Scrims - {now_str}"
+            color = 0xFFB800
+
+        if not history:
+            await interaction.response.send_message("📊 No leaderboard data yet.", ephemeral=True)
+            return
+
+        players = sorted(history.values(), key=lambda x: x.get("score", x.get("count", 0) * 50), reverse=True)[:10]
+
+        R, N, G, W, S = 2, 16, 6, 4, 5
+        sep    = f"+{'-'*(R+2)}+{'-'*(N+2)}+{'-'*(G+2)}+{'-'*(W+2)}+{'-'*(S+2)}+"
+        header = f"| {'#':<{R}} | {'Team Lead':^{N}} | {'Games':^{G}} | {'Wins':^{W}} | {'Score':^{S}} |"
+        rows   = [sep, header, sep]
+        for i, p in enumerate(players, 1):
+            name  = p.get("username", "Unknown")
+            if len(name) > N:
+                name = name[:N-3] + "..."
+            games = p.get("count", 0)
+            wins  = p.get("wins", 0)
+            score = p.get("score", games * 50)
+            rows.append(f"| {i:>{R}} | {name:^{N}} | {games:^{G}} | {wins:^{W}} | {score:^{S}} |")
+            rows.append("|")
+        rows.append(sep)
+        table = "```\n" + "\n".join(rows) + "\n```"
+
+        embed = discord.Embed(title=title_str, color=color)
+        embed.add_field(name="Teams",                        value=str(len(history)), inline=False)
+        embed.add_field(name=f"Standings (Top {len(players)})", value=table,          inline=False)
+        embed.set_footer(text="🌊 Ocean Scrims")
+        embed.timestamp = now
+
+        try:
+            await interaction.user.send(embed=embed)
+            await interaction.response.send_message("📬 Check your DMs for the leaderboard!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ I couldn't DM you. Please enable DMs from server members.", ephemeral=True)
+
+
 class BotManager:
     def __init__(self):
         self.bot = None
@@ -247,10 +532,26 @@ class BotManager:
             return []
 
     def _run(self, initial_settings):
-        self.loop = asyncio.new_event_loop()
+        # ProactorEventLoop (Windows default) misreports SSL errors with aiohttp;
+        # use SelectorEventLoop for the bot thread to avoid ssl:default [None] failures.
+        if sys.platform == "win32":
+            self.loop = asyncio.SelectorEventLoop()
+        else:
+            self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
+
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+
+        async def _make_connector():
+            return aiohttp.TCPConnector(ssl=ssl_ctx)
+
+        connector = self.loop.run_until_complete(_make_connector())
         intents = discord.Intents.all()
-        bot = commands.Bot(command_prefix=initial_settings.get("command_prefix", "!"), intents=intents)
+        bot = commands.Bot(
+            command_prefix=initial_settings.get("command_prefix", "!"),
+            intents=intents,
+            connector=connector,
+        )
         self.bot = bot
 
         # ── Schedule loop ───────────────────────────────────────────────
@@ -330,53 +631,431 @@ class BotManager:
                     await asyncio.sleep(60)
 
         # ── Bot events ──────────────────────────────────────────────────
+        _owner_id = None
+
         @bot.event
         async def on_ready():
+            nonlocal _owner_id
             self.bot_user = str(bot.user)
             print(f"Bot online: {bot.user}")
-            bot.loop.create_task(schedule_loop())
+            bot.add_view(VerifyView())
+            asyncio.get_running_loop().create_task(schedule_loop())
+            try:
+                app_info = await bot.application_info()
+                _owner_id = app_info.owner.id
+            except Exception:
+                pass
 
         @bot.event
         async def on_message(message):
             if message.author.bot:
                 return
-            s = load_settings()
+
+            # DM reply → set Fortnite nickname
+            if message.guild is None:
+                uid = str(message.author.id)
+                if uid in PENDING_NICKNAME:
+                    info = PENDING_NICKNAME.pop(uid)
+                    fortnite_name = message.content.strip()
+                    if not fortnite_name or len(fortnite_name) > 32:
+                        await message.reply("❌ Please send just your Fortnite username (max 32 characters).")
+                        PENDING_NICKNAME[uid] = info
+                        return
+
+                    renamed = False
+                    fail_reason = ""
+                    guild_id_str = info.get("guild_id", "")
+
+                    if not guild_id_str:
+                        fail_reason = "Guild ID not configured in bot settings."
+                    else:
+                        try:
+                            guild = bot.get_guild(int(guild_id_str))
+                            if not guild:
+                                fail_reason = f"Bot is not in guild {guild_id_str}."
+                            else:
+                                try:
+                                    member = guild.get_member(message.author.id)
+                                    if member is None:
+                                        member = await guild.fetch_member(message.author.id)
+                                except discord.NotFound:
+                                    fail_reason = "You are not in the server."
+                                    member = None
+
+                                if member:
+                                    if guild.owner_id == member.id:
+                                        fail_reason = "Server owners cannot have their nickname changed by a bot."
+                                    else:
+                                        try:
+                                            await member.edit(nick=fortnite_name, reason="Ocean Scrims verification")
+                                            renamed = True
+                                        except discord.Forbidden:
+                                            bot_member = guild.get_member(bot.user.id)
+                                            bot_top = bot_member.top_role.position if bot_member else 0
+                                            mem_top = member.top_role.position
+                                            if mem_top >= bot_top:
+                                                fail_reason = f"Your highest role is above or equal to the bot's role. Move the bot's role higher in Server Settings → Roles."
+                                            else:
+                                                fail_reason = "Missing permissions despite having admin — check role hierarchy."
+                                        except discord.HTTPException as e:
+                                            fail_reason = f"Discord error: {e}"
+                        except Exception as e:
+                            fail_reason = str(e)
+
+                    # Always save the name regardless of rename success
+                    s2 = load_settings()
+                    for v in s2.get("verified_users", []):
+                        if v["user_id"] == uid:
+                            v["epic_name"] = fortnite_name
+                    save_settings(s2)
+
+                    confirm = discord.Embed(color=0x00FF94 if renamed else 0xFF6B00)
+                    if renamed:
+                        confirm.title = "🎮  Nickname Set!"
+                        confirm.description = f"Your server nickname has been set to **{fortnite_name}**."
+                    else:
+                        confirm.title = "⚠️  Couldn't Rename You"
+                        confirm.description = f"Your Fortnite name **{fortnite_name}** has been saved, but the nickname couldn't be applied.\n\n**Reason:** {fail_reason}"
+                    await message.reply(embed=confirm)
+                    return
+
+            if message.guild is None:
+                return
+            gid = str(message.guild.id)
+
+            # Owner-only leave command — works in any server, any channel
+            if message.content.strip().lower() == "!leave" and _owner_id and message.author.id == _owner_id:
+                await message.reply("👋 Leaving. Bye!")
+                await message.guild.leave()
+                return
+
+            s = load_guild_settings(gid)
             prefix = s.get("command_prefix", "!")
             if not message.content.startswith(prefix):
                 return
             raw = message.content[len(prefix):].strip()
             cmd = raw.lower().split()[0] if raw.split() else ""
+            parts = raw.split()
+
+            # ── Admin setup commands ────────────────────────────────────
+            is_admin = message.author.guild_permissions.administrator
+            if cmd == "setscrimchannel" and is_admin:
+                try:
+                    s["scrim_channel_id"] = str(message.channel.id)
+                    os.makedirs(GUILDS_DIR, exist_ok=True)
+                    save_guild_settings(gid, s)
+                    await message.reply(f"✅ Scrim channel set to **#{message.channel.name}**.\nUse `{prefix}solos`, `{prefix}duos` etc. to start scrims.")
+                except Exception as e:
+                    await message.reply(f"❌ Setup failed: `{e}`")
+                return
+            if cmd == "setprefix" and is_admin:
+                new_prefix = parts[1] if len(parts) > 1 else "!"
+                s["command_prefix"] = new_prefix[:3]
+                save_guild_settings(gid, s)
+                await message.reply(f"✅ Prefix changed to `{new_prefix}`.")
+                return
+
             cmds = s.get("commands", {})
+
+            def _match_key(word):
+                w = word.lower()
+                for k in SCRIMS:
+                    if w in (k, cmds.get(k, "").lower(),
+                             SCRIMS[k]["name"].lower().replace(" ", "")):
+                        return k
+                return None
+
             for scrim_key in SCRIMS:
                 if cmd == cmds.get(scrim_key, "").lower():
-                    await _start_scrim(message.channel, s, scrim_key)
+                    # !solos [label...]  e.g. !solos silvers
+                    label = " ".join(parts[1:]).title() if len(parts) > 1 else ""
+                    s["active_scrim_label"] = label
+                    save_guild_settings(gid, s)
+                    try:
+                        await message.add_reaction("✅")
+                    except Exception:
+                        pass
+                    try:
+                        await _start_scrim(message.channel, s, scrim_key, gid)
+                    except Exception as e:
+                        import traceback
+                        err = traceback.format_exc()
+                        print(f"_start_scrim error: {err}")
+                        try:
+                            await message.channel.send(f"❌ Error: `{e}`")
+                        except Exception:
+                            pass
                     return
+
             if cmd == cmds.get("concluded", "concluded").lower():
-                await _conclude(message.channel, s)
+                # !concluded [gamemode] [label...]
+                if len(parts) > 1:
+                    key = _match_key(parts[1])
+                    if key:
+                        s["active_scrim"] = key
+                        s["active_scrim_label"] = " ".join(parts[2:]).title() if len(parts) > 2 else ""
+                    else:
+                        s["active_scrim_label"] = " ".join(parts[1:]).title()
+                await _conclude(message.channel, s, gid)
                 return
+
             if cmd == cmds.get("started", "started").lower():
-                parts = raw.split()
-                count = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
-                # Optional: !started 100 18:30
-                next_game_time = parts[2] if len(parts) > 2 and ":" in parts[2] else None
-                await _post_started(message.channel, s, count, next_game_time=next_game_time)
+                # !started [gamemode] [label...] <count> [time]
+                count = 0
+                next_game_time = None
+                num_idx = None
+                for i, p in enumerate(parts[1:], 1):
+                    if p.isdigit():
+                        count = int(p)
+                        num_idx = i
+                        if i + 1 < len(parts) and ":" in parts[i + 1]:
+                            next_game_time = parts[i + 1]
+                        break
+                pre = parts[1:num_idx] if num_idx is not None else parts[1:]
+                if pre:
+                    key = _match_key(pre[0])
+                    if key:
+                        s["active_scrim"] = key
+                        s["active_scrim_label"] = " ".join(pre[1:]).title() if len(pre) > 1 else ""
+                    else:
+                        s["active_scrim_label"] = " ".join(pre).title()
+                save_guild_settings(gid, s)
+                await _post_started(message.channel, s, count, next_game_time=next_game_time, guild_id=gid)
                 return
+
             if cmd == cmds.get("invite", "invite").lower():
                 await _post_invite(message.channel, s)
                 return
 
-        async def _post_started(source_channel, s, player_count, next_game_time=None):
+            if cmd == "dispatch":
+                # !dispatch <code>  — code is everything after dispatch
+                code = " ".join(parts[1:]).strip() if len(parts) > 1 else ""
+                if not code:
+                    await message.channel.send("Usage: `!dispatch <match code>`  e.g. `!dispatch ocean-5421`", delete_after=8)
+                    return
+                await _do_dispatch(message.channel, s, code, gid)
+                return
+
+            if cmd == "leaderboards":
+                mode_arg = parts[1] if len(parts) > 1 else None
+                scrim_key = _match_key(mode_arg) if mode_arg else s.get("active_scrim")
+                await _post_leaderboards(message.channel, s, scrim_key)
+                return
+
+            if cmd == "pts":
+                if not is_admin:
+                    return
+                if len(parts) < 3:
+                    await message.channel.send("Usage: `!pts <username> <points>`", delete_after=8)
+                    return
+                target = parts[1]
+                try:
+                    amount = int(parts[2])
+                except ValueError:
+                    await message.channel.send("❌ Points must be a number.", delete_after=8)
+                    return
+                history = s.get("signup_history", {})
+                uid = next((k for k, v in history.items() if v.get("username", "").lower() == target.lower()), None)
+                if uid is None:
+                    uid = f"manual_{target.lower()}"
+                    history[uid] = {"username": target, "count": 0, "score": 0, "wins": 0}
+                entry = history[uid]
+                entry["score"] = entry.get("score", entry.get("count", 0) * 50) + amount
+                history[uid] = entry
+                s["signup_history"] = history
+                save_guild_settings(gid, s)
+                await message.reply(f"✅ **{entry['username']}** — **{entry['score']}** points")
+                return
+
+            if cmd == "win":
+                if not is_admin:
+                    return
+                if len(parts) < 2:
+                    await message.channel.send("Usage: `!win <username>`", delete_after=8)
+                    return
+                target = parts[1]
+                history = s.get("signup_history", {})
+                uid = next((k for k, v in history.items() if v.get("username", "").lower() == target.lower()), None)
+                if uid is None:
+                    uid = f"manual_{target.lower()}"
+                    history[uid] = {"username": target, "count": 0, "score": 0, "wins": 0}
+                entry = history[uid]
+                entry["wins"] = entry.get("wins", 0) + 1
+                history[uid] = entry
+                s["signup_history"] = history
+                save_guild_settings(gid, s)
+                await message.reply(f"✅ **{entry['username']}** — **{entry['wins']}** win(s)")
+                return
+
+            if cmd == "epic":
+                ch_id = s.get("verify_channel_id", "")
+                ch = bot.get_channel(int(ch_id)) if ch_id else None
+                # Never post verify embed in a channel from a different guild
+                if ch and ch.guild.id != message.guild.id:
+                    ch = None
+                ch = ch or message.channel
+                embed = discord.Embed(
+                    title="Epic Account Verification",
+                    description=(
+                        "Please click on the raised hand below to link your Epic Account. "
+                        "You will receive a direct message from the bot with further instructions."
+                    ),
+                    color=0x00B4D8,
+                )
+                if ch.guild.icon:
+                    embed.set_thumbnail(url=ch.guild.icon.url)
+                embed.set_footer(text="\U0001f30a Ocean Scrims")
+                await ch.send(embed=embed, view=VerifyView())
+                if ch != message.channel:
+                    await message.channel.send(f"✅ Verification embed posted in {ch.mention}!", delete_after=5)
+                return
+
+        async def _do_dispatch(channel, s, match_code, guild_id=None):
+            gid   = str(guild_id or channel.guild.id)
+            active = s.get("active_scrim")
+            ch_id  = s.get("scrim_channel_id")
+            fetched = bot.get_channel(int(ch_id)) if ch_id else None
+            if fetched and fetched.guild.id != channel.guild.id:
+                fetched = None
+            ch = fetched or channel
+            scrim  = SCRIMS.get(active, SCRIMS["solos"])
+            snap   = dict(s)
+            orig_msg_id = s.get("active_scrim_message_id")
+
+            # Delete original sign-up message
+            if orig_msg_id:
+                try:
+                    orig = await ch.fetch_message(int(orig_msg_id))
+                    await orig.delete()
+                except Exception:
+                    pass
+
+            # Colour-ramp animation (identical to dashboard)
+            ramp_frames = [
+                (0x06080A, "🔐  **Securing match...**"),
+                (0x0A1018, "📡  **Broadcasting lobby...**"),
+                (0x0D1A28, "🔓  **Code locked in...**"),
+                (0x102238, "⚡  **Launching dispatch...**"),
+                (scrim["color"], "🚀  **DISPATCHED!**"),
+            ]
+            init = discord.Embed(color=ramp_frames[0][0])
+            init.description = ramp_frames[0][1]
+            init.set_footer(text="\U0001f30a Ocean Scrims")
+            msg = await ch.send("@everyone", embed=init)
+            for color, desc in ramp_frames[1:]:
+                await asyncio.sleep(0.7)
+                fr = discord.Embed(color=color)
+                fr.description = desc
+                fr.set_footer(text="\U0001f30a Ocean Scrims")
+                await msg.edit(embed=fr)
+            await asyncio.sleep(0.5)
+
+            # Dispatch embed
+            d_prefix = snap.get("dispatch_title_prefix", "🚨").strip()
+            d_suffix = snap.get("dispatch_title_suffix", "🚨").strip()
+            d_intro  = snap.get("dispatch_intro",  "**The lobby is live — get in!**")
+            d_missed = snap.get("dispatch_missed", "🟥  **Missed queue?** — React ✋ below to sign up late")
+            d_signed = snap.get("dispatch_signed", "⭕  **Already signed up?** — Ignore this message")
+            title_parts = [p for p in [d_prefix, f"{scrim['emoji']}  {scrim['name'].upper()} DISPATCH", d_suffix] if p]
+            embed = discord.Embed(
+                title="  ".join(title_parts),
+                color=scrim["color"],
+            )
+            embed.description = f"{d_intro}\n\n{d_missed}\n{d_signed}\n\n🔑  **Match Key**\n```\n{match_code}\n```"
+            embed.set_footer(text="\U0001f30a Ocean Scrims")
+            await msg.edit(embed=embed)
+            await msg.add_reaction("✋")
+            s2 = load_guild_settings(gid)
+            s2["active_dispatch_message_id"] = str(msg.id)
+            s2["active_scrim_message_id"] = None
+            s2["missed_signups"] = []
+            s2["dispatched"] = True
+            save_guild_settings(gid, s2)
+
+        async def _post_leaderboards(channel, s, scrim_key=None):
+            now = datetime.utcnow()
+            now_str = now.strftime("%m/%d/%Y")
+
+            if scrim_key and scrim_key in SCRIMS:
+                scrim = SCRIMS[scrim_key]
+                mode_history = s.get("signup_history_by_mode", {}).get(scrim_key, {})
+                if not mode_history:
+                    mode_history = s.get("signup_history", {})
+                title_str = f"Leaderboard {scrim['name']} Scrims - {now_str}"
+                color = scrim["color"]
+            else:
+                mode_history = s.get("signup_history", {})
+                title_str = f"Leaderboard All Scrims - {now_str}"
+                color = 0xFFB800
+
+            if not mode_history:
+                await channel.send("📊 No leaderboard data yet.")
+                return
+
+            players = sorted(
+                mode_history.values(),
+                key=lambda x: x.get("score", x.get("count", 0) * 50),
+                reverse=True
+            )[:10]
+
+            R, N, G, W, S = 2, 16, 6, 4, 5
+            sep = f"+{'-'*(R+2)}+{'-'*(N+2)}+{'-'*(G+2)}+{'-'*(W+2)}+{'-'*(S+2)}+"
+            header = f"| {'#':<{R}} | {'Team Lead':^{N}} | {'Games':^{G}} | {'Wins':^{W}} | {'Score':^{S}} |"
+
+            rows = [sep, header, sep]
+            for i, p in enumerate(players, 1):
+                name = p.get("username", "Unknown")
+                if len(name) > N:
+                    name = name[:N-3] + "..."
+                games = p.get("count", 0)
+                wins  = p.get("wins", 0)
+                score = p.get("score", games * 50)
+                rows.append(f"| {i:>{R}} | {name:^{N}} | {games:^{G}} | {wins:^{W}} | {score:^{S}} |")
+                rows.append("|")
+            rows.append(sep)
+
+            table = "```\n" + "\n".join(rows) + "\n```"
+
+            embed = discord.Embed(title=title_str, color=color)
+
+            invite = s.get("invite_link", "")
+            if invite:
+                embed.add_field(name="Server Invite Link 🔗", value=invite, inline=False)
+
+            started = s.get("active_scrim_started")
+            if started:
+                try:
+                    ts = int(datetime.fromisoformat(started).timestamp())
+                    embed.add_field(name="Start", value=f"<t:{ts}:F>", inline=True)
+                    embed.add_field(name="End",   value="—",            inline=True)
+                except Exception:
+                    pass
+
+            embed.add_field(name="Teams",                        value=str(len(mode_history)), inline=False)
+            embed.add_field(name=f"Standings (Top {len(players)})", value=table,              inline=False)
+
+            if channel.guild.icon:
+                embed.set_thumbnail(url=channel.guild.icon.url)
+            embed.set_footer(text="\U0001f30a Ocean Scrims")
+            embed.timestamp = now
+
+            gid = str(channel.guild.id) if channel.guild else ""
+            view = LeaderboardView(gid, scrim_key)
+            await channel.send(embed=embed, view=view)
+
+        async def _post_started(source_channel, s, player_count, next_game_time=None, guild_id=None):
+            gid = str(guild_id or (source_channel.guild.id if source_channel and source_channel.guild else ""))
             ch_id = s.get("schedule_channel_id") or s.get("scrim_channel_id")
             ch = (bot.get_channel(int(ch_id)) if ch_id else None) or source_channel
             if not ch:
                 return
 
             # Increment game counter
-            s2 = load_settings()
+            s2 = load_guild_settings(gid)
             s2["game_number"] = s2.get("game_number", 0) + 1
             game_num = s2["game_number"]
             max_games = int(s2.get("max_games", 0))
-            save_settings(s2)
+            save_guild_settings(gid, s2)
 
             interval = int(s.get("schedule_interval", 30))
             start_time = s.get("schedule_start_time", "00:00")
@@ -436,11 +1115,11 @@ class BotManager:
 
             s3["last_next_game_msg_id"] = str(sent.id)
             s3["last_next_game_ch_id"] = str(ch.id)
-            save_settings(s3)
+            save_guild_settings(gid, s3)
 
             # Auto-conclude when max games reached
             if max_games > 0 and game_num >= max_games:
-                s3 = load_settings()
+                s3 = load_guild_settings(gid)
                 if s3.get("active_scrim") and s3.get("scrim_channel_id"):
                     conclude_ch = bot.get_channel(int(s3["scrim_channel_id"]))
                     if conclude_ch:
@@ -449,7 +1128,7 @@ class BotManager:
                 s3["active_scrim_started"] = None
                 s3["active_scrim_message_id"] = None
                 s3["game_number"] = 0
-                save_settings(s3)
+                save_guild_settings(gid, s3)
 
         async def _post_invite(channel, s):
             invite = s.get("invite_link", "")
@@ -478,10 +1157,32 @@ class BotManager:
         self._post_started = _post_started
 
         @bot.event
+        async def on_guild_join(guild):
+            prefix = "!"
+            embed = discord.Embed(color=0x00D4FF)
+            embed.title = "🌊  Thanks for adding Ocean Scrims Helper!"
+            embed.description = (
+                f"To get started, have an **admin** type in your scrim channel:\n\n"
+                f"`{prefix}setscrimchannel`\n\n"
+                f"This sets the channel where scrims are posted. Then use:\n"
+                f"`{prefix}solos` `{prefix}duos` `{prefix}trios` `{prefix}squads`\n\n"
+                f"**Other setup commands:**\n"
+                f"`{prefix}setprefix <symbol>` — change the command prefix"
+            )
+            embed.set_footer(text="🌊 Ocean Scrims  •  Type !setscrimchannel to begin")
+            for ch in guild.text_channels:
+                try:
+                    await ch.send(embed=embed)
+                    break
+                except Exception:
+                    continue
+
+        @bot.event
         async def on_raw_reaction_add(payload):
             if payload.user_id == bot.user.id:
                 return
-            s = load_settings()
+            gid = str(payload.guild_id)
+            s = load_guild_settings(gid)
             guild = bot.get_guild(payload.guild_id)
             member = guild.get_member(payload.user_id) if guild else None
             uname = member.display_name if member else str(payload.user_id)
@@ -497,11 +1198,29 @@ class BotManager:
                             "timestamp": datetime.utcnow().isoformat(),
                         })
                         s["signups"] = signups
-                        save_settings(s)
+                        # Track for leaderboard
+                        history = s.get("signup_history", {})
+                        uid_str = str(payload.user_id)
+                        entry = history.get(uid_str, {"username": uname, "count": 0})
+                        entry["count"] += 1
+                        entry["username"] = uname
+                        history[uid_str] = entry
+                        s["signup_history"] = history
+                        mode_key = s.get("active_scrim")
+                        if mode_key:
+                            mode_hist = s.get("signup_history_by_mode", {})
+                            if mode_key not in mode_hist:
+                                mode_hist[mode_key] = {}
+                            m = mode_hist[mode_key].get(uid_str, {"username": uname, "count": 0, "wins": 0})
+                            m["count"] += 1
+                            m["username"] = uname
+                            mode_hist[mode_key][uid_str] = m
+                            s["signup_history_by_mode"] = mode_hist
+                        save_guild_settings(gid, s)
 
-            # 🙋 missed-out on the dispatch message
+            # ✋ missed-out on the dispatch message
             elif str(payload.message_id) == str(s.get("active_dispatch_message_id")):
-                if str(payload.emoji) == "🙋":
+                if str(payload.emoji) == "✋":
                     missed = s.get("missed_signups", [])
                     if not any(m["user_id"] == str(payload.user_id) for m in missed):
                         missed.append({
@@ -510,29 +1229,34 @@ class BotManager:
                             "timestamp": datetime.utcnow().isoformat(),
                         })
                         s["missed_signups"] = missed
-                        save_settings(s)
+                        save_guild_settings(gid, s)
 
         @bot.event
         async def on_raw_reaction_remove(payload):
-            s = load_settings()
+            gid = str(payload.guild_id)
+            s = load_guild_settings(gid)
             emoji = str(payload.emoji)
 
             if emoji == "✋" and str(payload.message_id) == str(s.get("active_scrim_message_id")):
                 s["signups"] = [su for su in s.get("signups", []) if su["user_id"] != str(payload.user_id)]
-                save_settings(s)
+                save_guild_settings(gid, s)
 
-            elif emoji == "🙋" and str(payload.message_id) == str(s.get("active_dispatch_message_id")):
+            elif emoji == "✋" and str(payload.message_id) == str(s.get("active_dispatch_message_id")):
                 s["missed_signups"] = [m for m in s.get("missed_signups", []) if m["user_id"] != str(payload.user_id)]
-                save_settings(s)
+                save_guild_settings(gid, s)
 
-        async def _start_scrim(channel, s, scrim_key):
+        async def _start_scrim(channel, s, scrim_key, guild_id=None):
             ch_id = s.get("scrim_channel_id")
-            target = (bot.get_channel(int(ch_id)) if ch_id else None) or channel
+            fetched = bot.get_channel(int(ch_id)) if ch_id else None
+            # Never post in a channel that belongs to a different guild
+            if fetched and channel and hasattr(channel, "guild") and fetched.guild.id != channel.guild.id:
+                fetched = None
+            target = fetched or channel
             s["active_scrim"] = scrim_key
             s["active_scrim_started"] = datetime.utcnow().isoformat()
             s["signups"] = []
             s["active_scrim_message_id"] = None
-            save_settings(s)
+            save_guild_settings(guild_id or target.guild.id, s)
             scrim = SCRIMS[scrim_key]
             loading = discord.Embed(color=scrim["color"])
             loading.description = "⠋  **Opening custom match...**"
@@ -554,12 +1278,16 @@ class BotManager:
             await msg.edit(embed=embed)
             await msg.add_reaction("✋")
             s["active_scrim_message_id"] = str(msg.id)
-            save_settings(s)
+            save_guild_settings(guild_id or target.guild.id, s)
 
-        async def _conclude(channel, s):
+        async def _conclude(channel, s, guild_id=None):
+            gid = str(guild_id or channel.guild.id)
             active = s.get("active_scrim")
             ch_id = s.get("scrim_channel_id")
-            target = (bot.get_channel(int(ch_id)) if ch_id else None) or channel
+            fetched = bot.get_channel(int(ch_id)) if ch_id else None
+            if fetched and fetched.guild.id != channel.guild.id:
+                fetched = None
+            target = fetched or channel
             if not active or active not in SCRIMS:
                 await channel.send("No active scrim to conclude.", delete_after=5)
                 return
@@ -569,10 +1297,11 @@ class BotManager:
             s["active_scrim_message_id"] = None
             s["game_number"] = 0
             s["dispatched"] = False
-            save_settings(s)
+            save_guild_settings(gid, s)
 
-        # Store _post_schedule so Flask can call it
+        # Store for Flask access
         self._post_schedule = _post_schedule
+        self._post_leaderboards = _post_leaderboards
 
         try:
             self.loop.run_until_complete(bot.start(initial_settings["token"]))
@@ -582,6 +1311,7 @@ class BotManager:
             self.bot_user = None
             self.bot = None
             self._post_schedule = None
+            self._post_leaderboards = None
 
 
 mgr = BotManager()
@@ -590,24 +1320,111 @@ mgr = BotManager()
 
 @flask_app.before_request
 def require_login():
-    if request.path.startswith("/static") or request.path == "/login":
+    if request.path.startswith("/static") or request.path in ("/login", "/signup", "/add", "/logout"):
+        return
+    if request.path.startswith("/verify/") or request.path.startswith("/unlink/"):
         return
     if not session.get("logged_in"):
         return redirect("/login")
+    # Scrim hosts can only access the dashboard and its scrim APIs
+    if session.get("role") == "host":
+        HOST_ALLOWED_PATHS = {
+            "/", "/api/me", "/api/meta", "/api/status",
+            "/api/signups", "/api/signups/missed", "/api/channels",
+            "/api/scrim/start", "/api/scrim/conclude", "/api/scrim/dispatch",
+            "/api/scrim/end-dispatch", "/api/scrim/started",
+            "/api/code-alert", "/logout",
+        }
+        if request.path not in HOST_ALLOWED_PATHS:
+            return jsonify({"error": "Forbidden"}), 403
+
+@flask_app.route("/api/me")
+def api_me():
+    s = load_settings()
+    return jsonify({"role": session.get("role", "admin"), "username": s.get("account_username", LOGIN_USERNAME or "")})
+
+
+@flask_app.route("/api/account/update", methods=["POST"])
+def api_account_update():
+    if not session.get("logged_in"):
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.json or {}
+    u = body.get("username", "").strip()
+    p = body.get("password", "")
+    p2 = body.get("confirm_password", "")
+    if not u or len(u) < 3:
+        return jsonify({"error": "Username must be at least 3 characters"}), 400
+    if p and len(p) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    if p and p != p2:
+        return jsonify({"error": "Passwords do not match"}), 400
+    s = load_settings()
+    s["account_username"] = u
+    if p:
+        s["account_password_hash"] = generate_password_hash(p)
+    save_settings(s)
+    return jsonify({"ok": True})
+
+@flask_app.route("/api/host-password", methods=["POST"])
+def api_set_host_password():
+    password = str((request.json or {}).get("password", "")).strip()
+    s = load_settings()
+    if not password:
+        s.pop("scrim_host_password_hash", None)
+        save_settings(s)
+        return jsonify({"ok": True, "cleared": True})
+    s["scrim_host_password_hash"] = generate_password_hash(password)
+    save_settings(s)
+    return jsonify({"ok": True})
 
 @flask_app.route("/login", methods=["GET", "POST"])
 def login():
+    if not _account_exists():
+        return redirect("/signup")
     error = None
     if request.method == "POST":
         u = request.form.get("username", "")
         p = request.form.get("password", "")
-        if u == LOGIN_USERNAME and p == LOGIN_PASSWORD and LOGIN_PASSWORD:
+        role = _check_login(u, p)
+        if role:
             session["logged_in"] = True
+            session["role"] = role
             return redirect("/")
         error = "Wrong username or password"
-    return render_template("login.html", error=error)
+    s = load_settings()
+    can_signup = not bool(s.get("account_password_hash"))
+    return render_template("login.html", error=error, can_signup=can_signup)
 
-@flask_app.route("/logout", methods=["POST"])
+
+@flask_app.route("/signup", methods=["GET", "POST"])
+def signup():
+    error = None
+    if request.method == "POST":
+        u = request.form.get("username", "").strip()
+        p = request.form.get("password", "")
+        p2 = request.form.get("confirm_password", "")
+        if not u:
+            error = "Username is required"
+        elif len(u) < 3:
+            error = "Username must be at least 3 characters"
+        elif not p:
+            error = "Password is required"
+        elif len(p) < 6:
+            error = "Password must be at least 6 characters"
+        elif p != p2:
+            error = "Passwords do not match"
+        else:
+            s = load_settings()
+            s["account_username"] = u
+            s["account_password_hash"] = generate_password_hash(p)
+            save_settings(s)
+            session["logged_in"] = True
+            session["role"] = "admin"
+            return redirect("/")
+    is_update = session.get("logged_in", False)
+    return render_template("signup.html", error=error, is_update=is_update)
+
+@flask_app.route("/logout", methods=["GET", "POST"])
 def logout():
     session.clear()
     return redirect("/login")
@@ -620,6 +1437,7 @@ def no_cache(r):
 
 @flask_app.route("/")
 def index():
+    flask_app.jinja_env.cache = {}
     return render_template("index.html")
 
 @flask_app.route("/static/<path:filename>")
@@ -630,6 +1448,27 @@ def static_files(filename):
 @flask_app.route("/api/meta")
 def api_meta():
     return jsonify({"scrims": {k: {"name": v["name"], "emoji": v["emoji"], "hex": v["hex"], "party": v["party"]} for k, v in SCRIMS.items()}})
+
+@flask_app.route("/add")
+def add_page():
+    if not mgr.is_running() or not mgr.bot or not mgr.bot.user:
+        return render_template("add_bot.html", invite_url="", bot_name="Ocean Scrims Helper", bot_avatar="")
+    client_id  = mgr.bot.user.id
+    invite_url = f"https://discord.com/oauth2/authorize?client_id={client_id}&permissions=8&scope=bot"
+    avatar_url = mgr.bot.user.display_avatar.url if mgr.bot.user.display_avatar else ""
+    return render_template("add_bot.html", invite_url=invite_url,
+                           bot_name=str(mgr.bot.user.name), bot_avatar=avatar_url)
+
+
+@flask_app.route("/api/bot/invite-url")
+def api_bot_invite_url():
+    if not mgr.is_running() or not mgr.bot or not mgr.bot.user:
+        return jsonify({"error": "Bot must be running to generate an invite URL"}), 400
+    client_id = mgr.bot.user.id
+    # permissions=8 = Administrator
+    url = f"https://discord.com/oauth2/authorize?client_id={client_id}&permissions=8&scope=bot"
+    return jsonify({"url": url, "client_id": str(client_id)})
+
 
 @flask_app.route("/api/status")
 def api_status():
@@ -671,6 +1510,25 @@ def api_bot_stop():
     mgr.stop()
     return jsonify({"ok": True})
 
+@flask_app.route("/api/roles")
+def api_roles():
+    s = load_settings()
+    gid = s.get("guild_id")
+    if not gid or not mgr.is_running() or not mgr.bot:
+        return jsonify({"roles": []})
+    async def _fetch():
+        guild = mgr.bot.get_guild(int(gid))
+        if not guild:
+            return []
+        return [{"id": str(r.id), "name": r.name}
+                for r in reversed(guild.roles) if r.name != "@everyone"]
+    try:
+        roles = asyncio.run_coroutine_threadsafe(_fetch(), mgr.loop).result(timeout=5)
+        return jsonify({"roles": roles})
+    except Exception:
+        return jsonify({"roles": []})
+
+
 @flask_app.route("/api/channels")
 def api_channels():
     s = load_settings()
@@ -692,7 +1550,11 @@ def api_save_settings():
                 "schedule_enabled", "schedule_channel_id", "schedule_scrim_type",
                 "schedule_interval", "schedule_start_time", "schedule_links",
                 "commands", "start_messages",
-                "concluded_line1", "concluded_line2", "concluded_line3"]:
+                "concluded_line1", "concluded_line2", "concluded_line3",
+                "verify_channel_id", "base_url", "epic_client_id", "epic_client_secret",
+                "scrim_priority_roles",
+                "dispatch_title_prefix", "dispatch_title_suffix",
+                "dispatch_intro", "dispatch_missed", "dispatch_signed"]:
         if key in body:
             s[key] = body[key]
     save_settings(s)
@@ -809,14 +1671,13 @@ def api_scrim_dispatch():
 
         scrim = SCRIMS[active]
 
-        # Colour-ramp animation: near-black → scrim colour on final frame
-        ramp_colors = [0x06080A, 0x0A1018, 0x0D1A28, 0x102238]
+        # Siren alert animation: dark → urgent red → scrim colour
         ramp_frames = [
-            (ramp_colors[0], "🔐  **Securing match...**"),
-            (ramp_colors[1], "📡  **Broadcasting lobby...**"),
-            (ramp_colors[2], "🔓  **Code locked in...**"),
-            (ramp_colors[3], "⚡  **Launching dispatch...**"),
-            (scrim["color"],  "🚀  **DISPATCHED!**"),
+            (0x1A0000, "🚨  **INCOMING DISPATCH — Stand by...**"),
+            (0x2D0500, "🔐  **Locking in match code...**"),
+            (0x1A0020, "📡  **Broadcasting to all players...**"),
+            (0x002530, "⚡  **Code confirmed — launching now...**"),
+            (scrim["color"], f"🚀  **{scrim['emoji']} DISPATCHED!**"),
         ]
 
         init = discord.Embed(color=ramp_frames[0][0])
@@ -825,7 +1686,7 @@ def api_scrim_dispatch():
         msg = await ch.send("@everyone", embed=init)
 
         for color, desc in ramp_frames[1:]:
-            await asyncio.sleep(0.7)
+            await asyncio.sleep(0.62)
             frame = discord.Embed(color=color)
             frame.description = desc
             frame.set_footer(text="\U0001f30a Ocean Scrims")
@@ -833,56 +1694,26 @@ def api_scrim_dispatch():
 
         await asyncio.sleep(0.5)
 
-        # Rich dispatch embed
-        embed = discord.Embed(color=scrim["color"])
-        embed.title = f"🚀  MATCH DISPATCHED  {scrim['emoji']}"
-        embed.description = (
-            f"**⚡  CUSTOM MATCH IS NOW LIVE — GET IN LOBBIES!**\n"
-            f"> 🙋  React below if you **missed sign-ups**\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🔑  **MATCH CODE**\n"
-            f"```\n{match_code}\n```"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        embed.add_field(
-            name=f"{scrim['emoji']}  Game Mode",
-            value=f"**{scrim['name']} Scrims**",
-            inline=True,
-        )
-        embed.add_field(
-            name="👥  Party Size",
-            value=f"**{scrim['party']} Player{'s' if scrim['party'] != 1 else ''}**",
-            inline=True,
-        )
-        if snap.get("verification_required", True):
-            embed.add_field(
-                name="⚠️  Verification Required",
-                value="All members of your team must be **verified** on this server.",
-                inline=False,
-            )
-        embed.add_field(
-            name="🖥️  Platforms",
-            value=snap.get("platforms", "PC / Windows, PlayStation, Xbox, Mobile"),
-            inline=False,
-        )
-        embed.add_field(
-            name="🎙️  Host",
-            value=f"**{snap.get('host_name', 'Ocean Scrims')}**",
-            inline=False,
-        )
-        if ch.guild.icon:
-            embed.set_thumbnail(url=ch.guild.icon.url)
-        embed.set_footer(text="\U0001f30a Ocean Scrims")
-        embed.timestamp = datetime.utcnow()
+        # Dispatch embed
+        host         = snap.get("host_name") or "Ocean Scrims"
+        game_num     = snap.get("game_number") or 1
+        signup_count = len(snap.get("signups", []))
+        d_prefix = snap.get("dispatch_title_prefix", "🚨").strip()
+        d_suffix = snap.get("dispatch_title_suffix", "🚨").strip()
+        d_intro  = snap.get("dispatch_intro",  "**The lobby is live — get in!**")
+        d_missed = snap.get("dispatch_missed", "🟥  **Missed queue?** — React ✋ below to sign up late")
+        d_signed = snap.get("dispatch_signed", "⭕  **Already signed up?** — Ignore this message")
 
-        if os.path.exists(BANNER_PATH):
-            embed.set_image(url="attachment://ocean_banner.png")
-            await msg.delete()
-            msg = await ch.send(embed=embed, file=discord.File(BANNER_PATH, filename="ocean_banner.png"))
-            await msg.add_reaction("🙋")
-        else:
-            await msg.edit(embed=embed)
-            await msg.add_reaction("🙋")
+        title_parts = [p for p in [d_prefix, f"{scrim['emoji']}  {scrim['name'].upper()} DISPATCH", d_suffix] if p]
+        embed = discord.Embed(
+            title="  ".join(title_parts),
+            color=scrim["color"],
+        )
+        embed.description = f"{d_intro}\n\n{d_missed}\n{d_signed}\n"
+        embed.add_field(name="🔑  Match Code", value=f"```\n{match_code}\n```", inline=False)
+        embed.set_footer(text=f"\U0001f30a {host}  •  Game #{game_num}  •  {signup_count} players")
+        await msg.edit(embed=embed)
+        await msg.add_reaction("✋")
 
         s2 = load_settings()
         s2["active_dispatch_message_id"] = str(msg.id)
@@ -1014,6 +1845,29 @@ def api_post_invite():
     return jsonify({"ok": True})
 
 
+@flask_app.route("/api/leaderboard/post", methods=["POST"])
+def api_leaderboard_post():
+    body = request.json or {}
+    channel_id = str(body.get("channel_id", "")).strip()
+    scrim_key = body.get("scrim_key") or None
+    if not channel_id:
+        return jsonify({"error": "No channel selected"}), 400
+    if not mgr.is_running():
+        return jsonify({"error": "Bot is not running"}), 400
+    fn = getattr(mgr, "_post_leaderboards", None)
+    if not fn:
+        return jsonify({"error": "Bot not fully ready yet"}), 400
+    s = load_settings()
+
+    async def do():
+        ch = mgr.bot.get_channel(int(channel_id))
+        if ch:
+            await fn(ch, s, scrim_key)
+
+    mgr.fire(do())
+    return jsonify({"ok": True})
+
+
 @flask_app.route("/api/scrim/announce", methods=["POST"])
 def api_scrim_announce():
     body = request.json or {}
@@ -1057,6 +1911,215 @@ def api_scrim_announce():
 
         msg = await ch.send("\n".join(lines))
         await msg.add_reaction("✋")
+
+    mgr.fire(do())
+    return jsonify({"ok": True})
+
+
+@flask_app.route("/verify/complete/<token>")
+def verify_complete(token):
+    """Landing page Epic redirects to after the user signs in."""
+    info = PENDING_VERIFICATIONS.get(token)
+    if not info:
+        return render_template("verify_result.html", success=False,
+                               message="This verification link has expired or already been used.")
+    return render_template("verify_page.html",
+        fin_token=token,
+        username=info["username"],
+        epic_name="",
+        guild_name=info["guild_name"],
+        guild_icon=info.get("guild_icon", ""),
+    )
+
+
+@flask_app.route("/verify/epic/finalize/<fin_token>", methods=["POST"])
+def verify_finalize(fin_token):
+    """Called by JS after the countdown completes."""
+    body      = request.get_json(silent=True) or {}
+    epic_name = str(body.get("epic_name", "")).strip()
+
+    info = PENDING_VERIFICATIONS.pop(f"fin_{fin_token}", None) or PENDING_VERIFICATIONS.pop(fin_token, None)
+    if not info:
+        return jsonify({"error": "expired"}), 404
+    PENDING_VERIFICATIONS.pop(info.get("state", ""), None)
+
+    # Prefer the name sent by the page over anything stored in the token
+    if not epic_name:
+        epic_name = info.get("epic_name", "")
+
+    s        = load_settings()
+    verified = s.get("verified_users", [])
+    user_id  = info["user_id"]
+    now      = datetime.utcnow().isoformat()
+    entry    = next((v for v in verified if v["user_id"] == user_id), None)
+    if entry:
+        entry.update({"epic_name": epic_name, "timestamp": now})
+    else:
+        verified.append({"user_id": user_id, "username": info["username"],
+                         "epic_name": epic_name, "timestamp": now})
+    s["verified_users"] = verified
+    save_settings(s)
+
+    unlink_tok = secrets.token_urlsafe(20)
+    base_url   = s.get("base_url", f"http://localhost:{PORT}").rstrip("/")
+    PENDING_VERIFICATIONS[f"unlink_{unlink_tok}"] = {"user_id": user_id, "username": info["username"]}
+    unlink_url = f"{base_url}/unlink/{unlink_tok}"
+
+    uid        = user_id
+    uname      = info["username"]
+    guild_name = info.get("guild_name", "Ocean Scrims")
+    guild_icon = info.get("guild_icon")
+    guild_id   = s.get("guild_id", "")
+
+    async def _finish():
+        try:
+            user = await mgr.bot.fetch_user(int(uid))
+
+            # Verified confirmation embed
+            embed = discord.Embed(color=0x00FF94)
+            embed.set_author(name=f"{guild_name}  •  Verified", icon_url=guild_icon)
+            embed.title = "✅  Account Verified!"
+            embed.description = (
+                f"You are now verified on **{guild_name}**.\n"
+                f"You now have full access to scrim lobbies. Welcome! 🌊\n\n"
+                f"**Reply to this message with your Fortnite username** and the bot will set your server nickname automatically."
+            )
+            embed.add_field(name="Discord", value=f"**{uname}**",      inline=True)
+            embed.add_field(name="Access",  value="🎮  Scrim Lobbies", inline=True)
+            if guild_icon:
+                embed.set_thumbnail(url=guild_icon)
+            embed.set_footer(text="🌊 Ocean Scrims  •  Click below to unlink")
+            embed.timestamp = datetime.utcnow()
+            msg = await user.send(embed=embed, view=_URLView("Unlink Account", unlink_url, "🔓"))
+
+            # Mark user as waiting for a nickname reply
+            if guild_id:
+                PENDING_NICKNAME[uid] = {"guild_id": guild_id, "dm_channel_id": str(msg.channel.id)}
+        except Exception:
+            pass
+
+    if mgr.is_running():
+        mgr.fire(_finish())
+
+    return jsonify({"ok": True, "epic_name": epic_name})
+
+
+@flask_app.route("/verify/epic/callback")
+def verify_epic_callback():
+    error = request.args.get("error", "")
+    if error:
+        return render_template("verify_result.html", success=False,
+                               message="Epic login was cancelled or denied.")
+
+    code  = request.args.get("code", "")
+    state = request.args.get("state", "")
+    info  = PENDING_VERIFICATIONS.get(state)
+    if not info:
+        return render_template("verify_result.html", success=False,
+                               message="This verification link has expired or already been used.")
+
+    s             = load_settings()
+    client_id     = s.get("epic_client_id", "").strip()
+    client_secret = s.get("epic_client_secret", "").strip()
+    base_url      = s.get("base_url", f"http://localhost:{PORT}").rstrip("/")
+    redirect_uri  = f"{base_url}/verify/epic/callback"
+
+    try:
+        # Exchange code → access token
+        body  = urllib.parse.urlencode({"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri}).encode()
+        creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+        req   = urllib.request.Request(EPIC_TOKEN_URL, data=body,
+                    headers={"Authorization": f"Basic {creds}",
+                             "Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            token_data = json.loads(r.read())
+        access_token = token_data["access_token"]
+
+        # Fetch Epic user info
+        uinfo = urllib.request.Request(EPIC_USERINFO_URL,
+                    headers={"Authorization": f"Bearer {access_token}"})
+        with urllib.request.urlopen(uinfo, timeout=10) as r:
+            epic_user = json.loads(r.read())
+
+        epic_name = epic_user.get("preferred_username") or epic_user.get("name") or "Unknown"
+        epic_id   = epic_user.get("sub", "")
+    except Exception:
+        return render_template("verify_result.html", success=False,
+                               message="Could not connect to Epic Games. Please try again.")
+
+    # Store finalize data; the countdown page calls back to complete recording
+    fin_token = secrets.token_urlsafe(20)
+    PENDING_VERIFICATIONS[f"fin_{fin_token}"] = {**info, "epic_name": epic_name, "epic_id": epic_id, "state": state}
+
+    return render_template("verify_page.html",
+        fin_token=fin_token,
+        username=info["username"],
+        epic_name=epic_name,
+        guild_name=info["guild_name"],
+        guild_icon=info.get("guild_icon", ""),
+    )
+
+
+@flask_app.route("/unlink/<token>")
+def unlink_page(token):
+    info = PENDING_VERIFICATIONS.get(f"unlink_{token}")
+    if not info:
+        return render_template("verify_result.html", success=False,
+                               message="This unlink link is invalid or has already been used.")
+    return render_template("unlink_page.html", token=token, username=info["username"])
+
+
+@flask_app.route("/unlink/<token>/confirm", methods=["POST"])
+def unlink_confirm(token):
+    info = PENDING_VERIFICATIONS.pop(f"unlink_{token}", None)
+    if not info:
+        return jsonify({"error": "expired"}), 404
+    s = load_settings()
+    s["verified_users"] = [v for v in s.get("verified_users", []) if v["user_id"] != info["user_id"]]
+    save_settings(s)
+    return jsonify({"ok": True})
+
+
+@flask_app.route("/api/verify/users")
+def api_verify_users():
+    s = load_settings()
+    return jsonify({"verified_users": s.get("verified_users", [])})
+
+
+@flask_app.route("/api/verify/remove", methods=["POST"])
+def api_verify_remove():
+    user_id = str((request.json or {}).get("user_id", ""))
+    s = load_settings()
+    s["verified_users"] = [v for v in s.get("verified_users", []) if v["user_id"] != user_id]
+    save_settings(s)
+    return jsonify({"ok": True})
+
+
+@flask_app.route("/api/verify/post", methods=["POST"])
+def api_verify_post():
+    s = load_settings()
+    ch_id = s.get("verify_channel_id")
+    if not ch_id:
+        return jsonify({"error": "No verify channel configured"}), 400
+    if not mgr.is_running():
+        return jsonify({"error": "Bot is not running"}), 400
+
+    async def do():
+        ch = mgr.bot.get_channel(int(ch_id))
+        if not ch:
+            return
+        embed = discord.Embed(
+            title="Epic Account Verification",
+            description=(
+                "Please click on the raised hand below to link your Epic Account. "
+                "You will receive a direct message from the bot with further instructions."
+            ),
+            color=0x00B4D8,
+        )
+        if ch.guild.icon:
+            embed.set_thumbnail(url=ch.guild.icon.url)
+        embed.set_footer(text="\U0001f30a Ocean Scrims")
+        await ch.send(embed=embed, view=VerifyView())
 
     mgr.fire(do())
     return jsonify({"ok": True})
